@@ -26,9 +26,6 @@
         },
         "teams-bot-tenant-id": {
           "secret": "YOUR_AZURE_TENANT_ID"
-        },
-        "devrev-user-token": {
-          "secret": "YOUR_DEVREV_USER_TOKEN"
         }
       }
     },

@@ -40,18 +40,29 @@ The snap-in does **NOT** use DevRev conversations or timelines for the Teams ↔
 
 ---
 
+## Authentication & Service Account Model
+
+The snap-in authenticates to DevRev strictly as a **service account**. DevRev automatically provisions the service account credentials (`event.context.secrets.service_account_token`) at runtime.
+
+- **NO DevRev user token (PAT)**: Do not require, store, or accept a DevRev user token anywhere. All DevRev operations (agent invocation, users directory lookup) use the service account token.
+- **Service account scopes**: Declared under `service_account.scopes.self` in `manifest.yaml`:
+  - `dev_user:read`: Query the DevRev users directory (`dev-users.list`) to match employee display names to emails.
+  - `ai_agent:read`: Invoke the AskHR AI agent (`don:core:dvrv-us-1:devo/...:ai_agent/...`) via `ai-agents.events.execute-async`.
+- **No ticket scopes**: The snap-in does **NOT** create tickets; the agent handles ticket creation via its own workflow.
+
+---
+
 ## Secrets & Keyrings Model
 
-All secrets are stored in **keyrings / connection settings** declared in `manifest.yaml`:
+Keyrings are used **exclusively for external secrets** (Microsoft Teams bot credentials). No DevRev tokens belong in keyrings:
 
 | Secret | Storage | Access in Code |
 |--------|---------|----------------|
 | Teams App Password | `keyrings.organization[teams-app-secret]` (type: `snap_in_secret`) | `event.input_data.keyrings["teams-app-secret"].secret` |
 | Teams App ID | `keyrings.organization[teams-bot-app-id]` (type: `snap_in_secret`) | `event.input_data.keyrings["teams-bot-app-id"].secret` |
 | Teams Tenant ID | `keyrings.organization[teams-bot-tenant-id]` (type: `snap_in_secret`) | `event.input_data.keyrings["teams-bot-tenant-id"].secret` |
-| DevRev User Token | `keyrings.organization[devrev-user-token]` (type: `snap_in_secret`) | `event.input_data.keyrings["devrev-user-token"].secret` (falls back to service account token) |
 | AskHR Agent ID | `inputs.organization[askhr_agent_id]` (field_type: `text`, default provided) | `event.input_data.global_values.askhr_agent_id` |
-| DevRev Service Account Token | Auto-provisioned by platform | `event.context.secrets.service_account_token` |
+| DevRev Service Account Token | Auto-provisioned by DevRev platform | `event.context.secrets.service_account_token` |
 
 **Never** hardcode secrets. **Never** log secret values.
 
@@ -75,9 +86,24 @@ The snap-in does **NOT** create tickets. The AskHR agent classifies issues and c
 
 These are real issues encountered during deployment — follow strictly:
 
-| ❌ Invalid Field | Context | Fix |
-|------------------|---------|-----|
+| ❌ Invalid / Missing Field | Context | Fix |
+|-----------------------------|---------|-----|
 | `is_optional` | Not a recognized field on `keyrings` entries | Remove entirely; keyrings are required by default |
+| Missing `service_account.scopes` | Validation error: `service_account.scopes is required by the snap-in to function` | Declare `scopes.self` with required permissions (`dev_user:read`, `ai_agent:read`) |
+
+### Valid service_account structure
+```yaml
+service_account:
+  display_name: AskHR Bot
+  scopes:
+    self:
+      - scope: dev_user:read
+        optional: false
+        reason: "Search DevRev users directory to resolve employee email"
+      - scope: ai_agent:read
+        optional: false
+        reason: "Invoke the AskHR agent via execute-async"
+```
 
 ### Valid keyring fields
 Only these fields are accepted on a keyring entry:

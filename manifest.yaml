@@ -8,6 +8,14 @@ description: "Bridges Microsoft Teams to the DevRev AskHR agent. Relays employee
 
 service_account:
   display_name: AskHR Bot
+  scopes:
+    self:
+      - scope: dev_user:read
+        optional: false
+        reason: "Search DevRev users directory to resolve employee email from Teams sender name"
+      - scope: ai_agent:read
+        optional: false
+        reason: "Invoke the AskHR agent via execute-async"
 
 ## Keyrings — all sensitive credentials stored securely
 keyrings:
@@ -27,12 +35,6 @@ keyrings:
     - name: teams-bot-tenant-id
       description: "Azure AD Tenant ID for the Teams bot"
       display_name: Teams Bot Tenant ID
-      types:
-        - snap_in_secret
-
-    - name: devrev-user-token
-      description: "DevRev user PAT for users directory lookup and agent invocation"
-      display_name: DevRev User Token
       types:
         - snap_in_secret
 

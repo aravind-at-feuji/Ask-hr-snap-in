@@ -25,12 +25,10 @@ export async function handleEvent(event: any): Promise<void> {
     const devrevEndpoint = event.execution_metadata.devrev_endpoint;
 
     // All Teams credentials from keyrings
-    const teamsAppPassword = event.input_data.keyrings?.["teams-app-secret"]?.secret ?? "";
-    const teamsAppId = event.input_data.keyrings?.["teams-bot-app-id"]?.secret ?? "";
-    const teamsTenantId = event.input_data.keyrings?.["teams-bot-tenant-id"]?.secret ?? "";
-
-    // DevRev user token from keyring (for users directory lookup + agent invocation)
-    const devrevUserToken = event.input_data.keyrings?.["devrev-user-token"]?.secret ?? devrevToken;
+    const keyrings = event.input_data?.keyrings ?? {};
+    const teamsAppPassword = keyrings["teams-app-secret"]?.secret ?? "";
+    const teamsAppId = keyrings["teams-bot-app-id"]?.secret ?? "";
+    const teamsTenantId = keyrings["teams-bot-tenant-id"]?.secret ?? "";
 
     // Configuration inputs (non-secret)
     const inputData = event.input_data.global_values ?? {};
@@ -100,7 +98,7 @@ export async function handleEvent(event: any): Promise<void> {
     let resolvedEmail: string | undefined = fromEmail;
     if (!resolvedEmail) {
       console.log(`[handle_teams_message] Email not in payload — resolving via DevRev users directory`);
-      const lookup = await resolveEmailByName(devrevEndpoint, devrevUserToken, fromName);
+      const lookup = await resolveEmailByName(devrevEndpoint, devrevToken, fromName);
       resolvedEmail = lookup.email;
       console.log(
         `[handle_teams_message] Email lookup result: ${
@@ -119,7 +117,7 @@ export async function handleEvent(event: any): Promise<void> {
     console.log(`[handle_teams_message] Dispatching to agent: ${agentId}`);
     await dispatchToAgent(
       devrevEndpoint,
-      devrevUserToken,
+      devrevToken,
       agentId,
       enrichedMessage,
       replyContext,
