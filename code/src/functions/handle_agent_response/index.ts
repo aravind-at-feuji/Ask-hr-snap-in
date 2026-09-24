@@ -23,13 +23,13 @@ export async function handleEvent(event: any): Promise<void> {
   console.log("[handle_agent_response] ===== Agent response received =====");
 
   try {
-    // Extract secrets and configuration
-    const teamsSecrets = event.input_data.keyrings?.["teams-bot-credentials"];
-    const teamsAppPassword = teamsSecrets?.secret ?? "";
+    // Extract secrets and configuration from keyrings
+    const keyrings = event.input_data?.keyrings ?? {};
+    const inputData = event.input_data?.global_values ?? {};
 
-    const inputData = event.input_data.global_values ?? {};
-    const teamsAppId = inputData.teams_bot_app_id ?? "";
-    const teamsTenantId = inputData.teams_bot_tenant_id ?? "";
+    const teamsAppPassword = keyrings["teams-app-secret"]?.secret ?? "";
+    const teamsAppId = keyrings["teams-bot-app-id"]?.secret ?? inputData.teams_bot_app_id ?? "";
+    const teamsTenantId = keyrings["teams-bot-tenant-id"]?.secret ?? inputData.teams_bot_tenant_id ?? "";
 
     // Extract the agent response payload
     const payload = event.payload ?? {};

@@ -20,6 +20,11 @@ The AskHR snap-in uses a **two-phase asynchronous** design to bridge Microsoft T
 4. Otherwise, send the answer as a plain text/markdown message.
 5. Authenticate to Bot Framework and POST the reply to Teams.
 
+### Event Sources
+Both event sources use `flow-custom-webhook` type with `custom:action` event type:
+- `teams-inbound` → `handle_teams_message` (automation: `on-teams-inbound`)
+- `agent-response` → `handle_agent_response` (automation: `on-agent-response`)
+
 ---
 
 ## CRITICAL: Agent Invocation Method
@@ -41,11 +46,12 @@ All secrets are stored in **keyrings / connection settings** declared in `manife
 
 | Secret | Storage | Access in Code |
 |--------|---------|----------------|
-| Teams App Password | `keyrings.organization[teams-bot-credentials]` | `event.input_data.keyrings["teams-bot-credentials"].secret` |
-| Teams App ID | `inputs.organization[teams_bot_app_id]` | `event.input_data.global_values.teams_bot_app_id` |
-| Teams Tenant ID | `inputs.organization[teams_bot_tenant_id]` | `event.input_data.global_values.teams_bot_tenant_id` |
-| AskHR Agent ID | `inputs.organization[askhr_agent_id]` | `event.input_data.global_values.askhr_agent_id` |
-| DevRev Service Account Token | Auto-provisioned | `event.context.secrets.service_account_token` |
+| Teams App Password | `keyrings.organization[teams-app-secret]` (type: `snap_in_secret`) | `event.input_data.keyrings["teams-app-secret"].secret` |
+| Teams App ID | `keyrings.organization[teams-bot-app-id]` (type: `snap_in_secret`) | `event.input_data.keyrings["teams-bot-app-id"].secret` |
+| Teams Tenant ID | `keyrings.organization[teams-bot-tenant-id]` (type: `snap_in_secret`) | `event.input_data.keyrings["teams-bot-tenant-id"].secret` |
+| DevRev User Token | `keyrings.organization[devrev-user-token]` (type: `snap_in_secret`) | `event.input_data.keyrings["devrev-user-token"].secret` (falls back to service account token) |
+| AskHR Agent ID | `inputs.organization[askhr_agent_id]` (field_type: `text`, default provided) | `event.input_data.global_values.askhr_agent_id` |
+| DevRev Service Account Token | Auto-provisioned by platform | `event.context.secrets.service_account_token` |
 
 **Never** hardcode secrets. **Never** log secret values.
 
@@ -59,6 +65,54 @@ The snap-in does **NOT** create tickets. The AskHR agent classifies issues and c
 
 ## Email Resolution
 
-- Search DevRev users directory by display name.
+- Search DevRev users directory by display name via `dev-users.list`.
 - **Exactly one match** → use that user's email.
 - **Zero or multiple matches** → leave email blank. **Never guess or fabricate.**
+
+---
+
+## Manifest Schema Pitfalls (Validated Against DevRev API)
+
+These are real issues encountered during deployment — follow strictly:
+
+| ❌ Invalid Field | Context | Fix |
+|------------------|---------|-----|
+| `is_optional` | Not a recognized field on `keyrings` entries | Remove entirely; keyrings are required by default |
+
+### Valid keyring fields
+Only these fields are accepted on a keyring entry:
+- `name`, `description`, `display_name`, `types`
+
+### Valid input fields
+- `name`, `description`, `field_type`, `default_value`, `is_required`, `ui` (with `display_name`)
+
+---
+
+## Deployment Rules
+
+### ⚠️ Never run snap-in deployment commands automatically
+Always **provide commands to the user** for manual execution. Never execute these directly:
+```
+devrev snap_in_version create-one ...
+devrev snap_in draft
+devrev snap_in update
+devrev snap_in activate
+```
+
+### ⚠️ Run from the project root, not `code/`
+The DevRev CLI looks for `manifest.yaml` in the current directory. Always run from:
+```
+devrev-snaps-typescript-template/     ← HERE (contains manifest.yaml)
+├── manifest.yaml
+├── code/
+│   ├── package.json
+│   └── src/
+```
+**Not** from `code/` — that will fail with `could not find 'manifest.yaml'`.
+
+### Build before deploy
+```bash
+cd code && npm install && npm run build
+cd ..
+devrev snap_in_version create-one --path . --create-package
+```

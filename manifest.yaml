@@ -9,35 +9,36 @@ description: "Bridges Microsoft Teams to the DevRev AskHR agent. Relays employee
 service_account:
   display_name: AskHR Bot
 
-## Keyrings — Teams bot credentials stored securely
+## Keyrings — all sensitive credentials stored securely
 keyrings:
   organization:
-    - name: teams-bot-credentials
-      description: "Microsoft Teams Bot Framework credentials (App ID, App Password, Tenant ID)"
-      display_name: Teams Bot Credentials
+    - name: teams-app-secret
+      description: "Microsoft App Password (client secret) for the Teams bot"
+      display_name: Teams App Secret
       types:
         - snap_in_secret
-      is_optional: false
+
+    - name: teams-bot-app-id
+      description: "Microsoft App ID (client ID) for the Teams bot"
+      display_name: Teams Bot App ID
+      types:
+        - snap_in_secret
+
+    - name: teams-bot-tenant-id
+      description: "Azure AD Tenant ID for the Teams bot"
+      display_name: Teams Bot Tenant ID
+      types:
+        - snap_in_secret
+
+    - name: devrev-user-token
+      description: "DevRev user PAT for users directory lookup and agent invocation"
+      display_name: DevRev User Token
+      types:
+        - snap_in_secret
 
 ## Inputs — non-secret configuration
 inputs:
   organization:
-    - name: teams_bot_app_id
-      description: "Microsoft Teams Bot App ID (also known as Microsoft App ID)"
-      field_type: text
-      default_value: ""
-      is_required: true
-      ui:
-        display_name: Teams Bot App ID
-
-    - name: teams_bot_tenant_id
-      description: "Azure AD Tenant ID for the Teams bot (for single-tenant bots)"
-      field_type: text
-      default_value: ""
-      is_required: false
-      ui:
-        display_name: Teams Bot Tenant ID
-
     - name: askhr_agent_id
       description: "The DevRev AskHR agent DON identifier"
       field_type: text

@@ -24,14 +24,16 @@ export async function handleEvent(event: any): Promise<void> {
     const devrevToken = event.context.secrets.service_account_token;
     const devrevEndpoint = event.execution_metadata.devrev_endpoint;
 
-    // Teams bot credentials from keyring
-    const teamsSecrets = event.input_data.keyrings?.["teams-bot-credentials"];
-    const teamsAppPassword = teamsSecrets?.secret ?? "";
+    // All Teams credentials from keyrings
+    const teamsAppPassword = event.input_data.keyrings?.["teams-app-secret"]?.secret ?? "";
+    const teamsAppId = event.input_data.keyrings?.["teams-bot-app-id"]?.secret ?? "";
+    const teamsTenantId = event.input_data.keyrings?.["teams-bot-tenant-id"]?.secret ?? "";
 
-    // Configuration inputs
+    // DevRev user token from keyring (for users directory lookup + agent invocation)
+    const devrevUserToken = event.input_data.keyrings?.["devrev-user-token"]?.secret ?? devrevToken;
+
+    // Configuration inputs (non-secret)
     const inputData = event.input_data.global_values ?? {};
-    const teamsAppId = inputData.teams_bot_app_id ?? "";
-    const teamsTenantId = inputData.teams_bot_tenant_id ?? "";
     const agentId =
       inputData.askhr_agent_id ??
       "don:core:dvrv-us-1:devo/118bWKFTfx:ai_agent/61";
@@ -98,7 +100,7 @@ export async function handleEvent(event: any): Promise<void> {
     let resolvedEmail: string | undefined = fromEmail;
     if (!resolvedEmail) {
       console.log(`[handle_teams_message] Email not in payload — resolving via DevRev users directory`);
-      const lookup = await resolveEmailByName(devrevEndpoint, devrevToken, fromName);
+      const lookup = await resolveEmailByName(devrevEndpoint, devrevUserToken, fromName);
       resolvedEmail = lookup.email;
       console.log(
         `[handle_teams_message] Email lookup result: ${
@@ -117,7 +119,7 @@ export async function handleEvent(event: any): Promise<void> {
     console.log(`[handle_teams_message] Dispatching to agent: ${agentId}`);
     await dispatchToAgent(
       devrevEndpoint,
-      devrevToken,
+      devrevUserToken,
       agentId,
       enrichedMessage,
       replyContext,

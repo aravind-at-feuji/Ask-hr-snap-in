@@ -10,13 +10,20 @@
     },
     "input_data": {
       "global_values": {
-        "teams_bot_app_id": "YOUR_TEAMS_BOT_APP_ID",
-        "teams_bot_tenant_id": "YOUR_AZURE_TENANT_ID",
         "askhr_agent_id": "don:core:dvrv-us-1:devo/118bWKFTfx:ai_agent/61"
       },
       "keyrings": {
-        "teams-bot-credentials": {
+        "teams-app-secret": {
           "secret": "YOUR_TEAMS_BOT_APP_PASSWORD"
+        },
+        "teams-bot-app-id": {
+          "secret": "YOUR_TEAMS_BOT_APP_ID"
+        },
+        "teams-bot-tenant-id": {
+          "secret": "YOUR_AZURE_TENANT_ID"
+        },
+        "devrev-user-token": {
+          "secret": "YOUR_DEVREV_USER_TOKEN"
         }
       }
     },
