@@ -1,0 +1,40 @@
+[
+  {
+    "context": {
+      "secrets": {
+        "service_account_token": "YOUR_DEVREV_SERVICE_ACCOUNT_TOKEN"
+      }
+    },
+    "execution_metadata": {
+      "devrev_endpoint": "https://api.devrev.ai"
+    },
+    "input_data": {
+      "global_values": {
+        "teams_bot_app_id": "YOUR_TEAMS_BOT_APP_ID",
+        "teams_bot_tenant_id": "YOUR_AZURE_TENANT_ID",
+        "askhr_agent_id": "don:core:dvrv-us-1:devo/118bWKFTfx:ai_agent/61"
+      },
+      "keyrings": {
+        "teams-bot-credentials": {
+          "secret": "YOUR_TEAMS_BOT_APP_PASSWORD"
+        }
+      }
+    },
+    "payload": {
+      "data": {
+        "message": "According to our leave policy, employees are entitled to 24 days of paid leave per year, including 12 casual leaves and 12 sick leaves. Leaves can be applied through the HRMS portal (Nicoya). For more details, please refer to the HR Policy section in the employee handbook.",
+        "is_greeting": false,
+        "client_metadata": {
+          "serviceUrl": "https://smba.trafficmanager.net/in/",
+          "conversationId": "a]chat-id-abc123",
+          "tenantId": "YOUR_AZURE_TENANT_ID",
+          "botId": "28:bot-app-id-456",
+          "botName": "AskHR",
+          "recipientId": "29:user-aad-id-123",
+          "recipientName": "Aravind Induri",
+          "activityId": "test-activity-001"
+        }
+      }
+    }
+  }
+]

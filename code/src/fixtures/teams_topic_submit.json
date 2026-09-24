@@ -1,0 +1,53 @@
+[
+  {
+    "context": {
+      "secrets": {
+        "service_account_token": "YOUR_DEVREV_SERVICE_ACCOUNT_TOKEN"
+      }
+    },
+    "execution_metadata": {
+      "devrev_endpoint": "https://api.devrev.ai",
+      "event_sources": {
+        "agent-response": {
+          "webhook_url": "https://YOUR_AGENT_RESPONSE_WEBHOOK_URL"
+        }
+      }
+    },
+    "input_data": {
+      "global_values": {
+        "teams_bot_app_id": "YOUR_TEAMS_BOT_APP_ID",
+        "teams_bot_tenant_id": "YOUR_AZURE_TENANT_ID",
+        "askhr_agent_id": "don:core:dvrv-us-1:devo/118bWKFTfx:ai_agent/61"
+      },
+      "keyrings": {
+        "teams-bot-credentials": {
+          "secret": "YOUR_TEAMS_BOT_APP_PASSWORD"
+        }
+      }
+    },
+    "payload": {
+      "data": {
+        "type": "invoke",
+        "value": {
+          "action": "askhr_topic_submit",
+          "selectedTopic": "Leave Management"
+        },
+        "serviceUrl": "https://smba.trafficmanager.net/in/",
+        "from": {
+          "id": "29:user-aad-id-123",
+          "name": "Aravind Induri",
+          "aadObjectId": "aad-object-id-123"
+        },
+        "conversation": {
+          "id": "a]chat-id-abc123",
+          "tenantId": "YOUR_AZURE_TENANT_ID",
+          "conversationType": "personal"
+        },
+        "recipient": {
+          "id": "28:bot-app-id-456",
+          "name": "AskHR"
+        }
+      }
+    }
+  }
+]

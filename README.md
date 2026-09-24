@@ -1,153 +1,164 @@
-## DevRev Snaps TypeScript Template
+# AskHR — DevRev Snap-in for Microsoft Teams
 
-This repository contains a template for the functions that can be deployed as
-part of Snap-Ins.
+A DevRev snap-in that bridges Microsoft Teams to the DevRev AskHR agent. Employees send HR questions in Teams; the snap-in enriches messages with employee context, dispatches them to the AskHR agent, and returns real agent responses — including greeting cards with an 18-topic dropdown.
 
-For reference on snap-ins, refer to the [documentation](https://github.com/devrev/snap-in-docs).
-
-### Getting started with the template
-
-1. Create a new repository using this template.
-2. In the new repository, you can add functions at the path `src/functions` where the folder name corresponds to the function name in your manifest file.
-3. Ensure to include each new function in the file named "src/function-factory.ts".
-
-### Testing locally
-
-To test your code locally, add test events under 'src/fixtures' following the example event provided. Additionally, you can include keyring values in the event payload to test API calls.```
-
-After adding the event, execute the following commands to test your code:
+## Architecture
 
 ```
+Teams User ──► [teams-inbound webhook] ──► handle_teams_message()
+                                              │
+                                              ├─ Resolve employee email (DevRev users API)
+                                              ├─ Build Employee Context header
+                                              └─ ai-agents.events.execute-async ──► AskHR Agent
+                                                                                        │
+                                                                                        ▼
+Teams User ◄── Bot Framework REST API ◄── handle_agent_response() ◄── [agent-response webhook]
+```
+
+**Two-phase async** design: DevRev's serverless runtime cannot hold an HTTP connection open while waiting for the agent. The flow is split into two functions connected by two event sources.
+
+### Critical Constraint
+- Agent invocation uses **`ai-agents.events.execute-async` ONLY**.
+- **No** `conversations.list` / conversation-add approach (causes hand-off problems).
+- The snap-in does **not** create tickets — the agent handles ticket creation internally.
+
+## Prerequisites
+
+1. **DevRev CLI** installed and authenticated (`devrev profiles authenticate`)
+2. **Node.js** ≥ 18 and **npm**
+3. **Microsoft Azure Bot** registered with:
+   - App ID (Microsoft App ID)
+   - App Password (Client Secret)
+   - Tenant ID (for single-tenant bots)
+4. **AskHR Agent** configured in DevRev (ID: `don:core:dvrv-us-1:devo/118bWKFTfx:ai_agent/61`)
+
+## Secrets & Configuration (Provided at Install)
+
+| Setting | Type | Description |
+|---------|------|-------------|
+| **Teams Bot Credentials** | Keyring (snap_in_secret) | Microsoft App Password (client secret) |
+| **Teams Bot App ID** | Input (text) | Microsoft App ID for the bot |
+| **Teams Bot Tenant ID** | Input (text, optional) | Azure AD Tenant ID |
+| **AskHR Agent ID** | Input (text) | DevRev agent DON identifier |
+
+The DevRev service account token is automatically provisioned.
+
+## Project Structure
+
+```
+├── manifest.yaml                          # Snap-in manifest (event sources, functions, keyrings)
+├── .agents/
+│   ├── rules/agent_architecture_rule.md   # Architecture constraints documentation
+│   └── skills/askhr_operations.md         # Operational runbooks
+├── code/
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── src/
+│       ├── function-factory.ts            # Function registry
+│       ├── index.ts                       # Exports
+│       ├── main.ts                        # Local test runner
+│       ├── devrev/
+│       │   ├── types.ts                   # Shared type definitions
+│       │   ├── agent-client.ts            # execute-async dispatch + response extraction
+│       │   └── users.ts                   # Name → email lookup via DevRev users API
+│       ├── teams/
+│       │   └── teams-client.ts            # Bot Framework auth + send messages/cards
+│       ├── functions/
+│       │   ├── handle_teams_message/
+│       │   │   └── index.ts               # Phase 1: Teams inbound → agent dispatch
+│       │   └── handle_agent_response/
+│       │       └── index.ts               # Phase 2: Agent reply → Teams response
+│       └── fixtures/
+│           ├── teams_inbound_message.json  # Test: regular message
+│           ├── teams_topic_submit.json     # Test: topic selection from card
+│           └── agent_response_event.json   # Test: agent response
+```
+
+## Deploy
+
+```bash
+# 1. Install dependencies and build
+cd code
 npm install
-npm run start -- --functionName=on_work_creation --fixturePath=on_work_created_event.json
-```
+npm run build
 
-### Adding external dependencies
+# 2. Create snap-in version (creates package on first run)
+devrev snap_in_version create-one --path . --create-package
 
-You can also add dependencies on external packages to package.json under the “dependencies” key. These dependencies will be made available to your function at runtime and during testing.
-
-### Linting
-
-To check for lint errors, run the following command:
-
-```bash
-npm run lint
-```
-
-To automatically fix fixable lint errors, run:
-
-```bash
-npm run lint:fix
-```
-
-### Deploying Snap-ins
-
-Once you are done with the testing, run the following commands to deploy your snap-in:
-
-1. Authenticate to devrev CLI, run the following command:
-
-```
-devrev profiles authenticate --org <devorg name> --usr <user email>
-```
-
-2. To create a snap_in_version, run the following command:
-
-```
-devrev snap_in_version create-one --path <template path> --create-package
-```
-
-3. Draft the snap_in, run the following command:
-
-```
+# 3. Draft → Update → Activate
 devrev snap_in draft
-```
-
-4. To update the snap-in, run the following command:
-
-```
 devrev snap_in update
-```
-
-5. Activate the snap_in
-
-```
 devrev snap_in activate
 ```
 
-### Testing Snap-in changes locally
+After activation, configure the **Teams bot messaging endpoint** to point to the `teams-inbound` event source URL (visible in DevRev snap-in settings).
 
-### Setting up the server
+## Testing Outside Teams (Real Responses)
 
-To test out changes in snap-in locally, developers can create a snap-in version in test mode.
-A snap-in version created in test mode enables developers to specify a public HTTP URL to receive events from DevRev. This makes for
-quick code changes on the local machine without needing to repeatedly deploy the snap-in again for testing the changes.
+Since the flow is async, you verify the **real agent reply in snap-in logs**, not in the HTTP response.
 
-To test out a snap-in version locally, follow the below steps:
+### 1. Send a test message
 
-1. Run a server locally to ingest events from DevRev. The `port` parameter is optional. If not set, the server starts default on `8000`.
-
-```
-npm run test:server -- --port=<PORT>
-```
-
-2. Expose the local port as a publicly available URL. We recommend using [`ngrok`](https://ngrok.com/download) since it is free and easy to set up. The command for running ngrok tunnelling on port `8000`:
-
-```
-ngrok http 8000
-```
-
-This returns a public HTTP URL.
-
-3. Create a snap-in version with the `testing-url` flag set
-
-```
-devrev snap_in_version create-one --path <template path> --create-package --testing-url <HTTP_URL>
+```bash
+curl -X POST "https://<your-teams-inbound-webhook-url>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "message",
+    "serviceUrl": "https://smba.trafficmanager.net/in/",
+    "from": { "id": "test-user-1", "name": "Aravind Induri" },
+    "conversation": { "id": "test-conv-1", "tenantId": "YOUR_TENANT_ID" },
+    "recipient": { "id": "YOUR_BOT_ID", "name": "AskHR" },
+    "text": "What is the leave policy?"
+  }'
 ```
 
-Here, `HTTP_URL` is the publicly available URL from Step 2. The URL should start with `http` or `https`
-
-4. Once the snap-in version is ready, create a snap-in, update and activate it.
+### 2. Check snap-in logs for Phase 1 (`handle_teams_message`)
 
 ```
-devrev snap_in draft
+[handle_teams_message] ===== Inbound Teams activity received =====
+[handle_teams_message] Activity type: message
+[handle_teams_message] Regular message: "What is the leave policy?"
+[handle_teams_message] From: Aravind Induri, ConversationId: test-conv-1
+[users] Searching DevRev users directory for name="Aravind Induri"
+[users] Exactly one match found. Email: (resolved)
+[handle_teams_message] Enriched message built (xxx chars)
+[handle_teams_message] Dispatching to agent: don:core:dvrv-us-1:devo/118bWKFTfx:ai_agent/61
+[agent-client] Agent dispatch successful. Status: 200
+[handle_teams_message] ===== Dispatch complete. Exiting. =====
 ```
 
-Update the snap-in through UI or using the CLI:
+### 3. Check snap-in logs for Phase 2 (`handle_agent_response`)
 
 ```
-devrev snap_in update
+[handle_agent_response] ===== Agent response received =====
+[handle_agent_response] Agent reply (first 200 chars): "According to our leave policy..."
+[handle_agent_response] Is greeting: false
+[teams-client] Bot Framework token acquired successfully
+[handle_agent_response] Sending plain text response to Teams
+[teams-client] Message sent successfully. Status: 200
+[handle_agent_response] ===== Reply sent to Teams. Done. =====
 ```
 
-Activate the snap-in through UI or through the CLI command:
+### Local test runner (fixture-based)
 
-```
-devrev snap_in activate
-```
-
-### Receiving events locally
-
-After the snap-in has been activated, it can receive events locally from DevRev as a
-snap-in would. If the snap-in was listening to `work_created` event type, then creating a
-new work-item would send the event to the local server.
-
-If utilizing ngrok, accessing the ngrok UI is possible by opening http://127.0.0.1:4040/ in the browser. This interface offers a neat way to review the list of requests and replay them if necessary.
-
-The service account token included with the request is valid for only 30 minutes. Therefore, attempting to call the DevRev API with that token for events older than this timeframe will result in a '401 Unauthorized' error.
-
-### Updating manifest or the URL
-
-The code can be changed without the need to create a snap-in version or redeploy the snap-in. On any change to the
-`src` folder, the server restarts with the updated changes. However, on [patch compatible](https://developer.devrev.ai/snap-in-development/upgrade-snap-ins#version-compatibility) updates to the manifest or the testing URL, we can `upgrade` the snap-in version.
-
-```
-devrev snap_in_version upgrade --manifest <PATH_TO_MANIFEST> --testing-url <UPDATED_URL>
+```bash
+cd code
+npm run start -- --functionName=handle_teams_message --fixturePath=teams_inbound_message.json
+npm run start -- --functionName=handle_agent_response --fixturePath=agent_response_event.json
 ```
 
-In case of non-patch compatible updates, the `force` flag can be used to upgrade the version. However this will delete any
-existing snap-ins that have been created from this version.
+> **Note:** Replace `YOUR_*` placeholders in fixture files with real values before running.
 
-```
-devrev snap_in_version upgrade --force --manifest <PATH_TO_MANIFEST> --testing-url <UPDATED_URL>
-```
+## Greeting Flow
 
-Do note that manifest must always be provided when upgrading a snap-in version.
+On greeting turns, the snap-in sends an **Adaptive Card** with:
+- The agent's greeting text
+- A compact dropdown (`Input.ChoiceSet`) with 18 HR topics:
+  - Onboarding & Joining Formalities, BGV, ID & Access Management, Payroll Timelines, Payroll & Statutory, PF / Tax, Leave Management, Attendance Management, Probation, Variable Payout, Exit Management, Compensatory Offs, Health Insurance, HR Policy, Expense Management, L&D, HRMS (Nicoya), Employee Letters
+- An **"Ask HR"** submit button
+
+When the user selects a topic and clicks "Ask HR", Teams sends an `Action.Submit` back to `teams-inbound`, which is detected and dispatched to the agent as a regular inquiry.
+
+## License
+
+Internal use only.

@@ -1,46 +1,101 @@
-# For reference: https://docs.devrev.ai/snap-ins/references/manifest.
-# Refactor the code based on your business logic.
+## AskHR Snap-in Manifest
+## Bridges Microsoft Teams to DevRev AskHR agent via two-phase async architecture.
+## Reference: https://developer.devrev.ai/snapin-development/references/manifest
 
 version: "2"
-name: "Work Tracker"
-description: "Logs a message when a work item is created"
+name: "AskHR"
+description: "Bridges Microsoft Teams to the DevRev AskHR agent. Relays employee HR inquiries with context enrichment and returns real agent responses."
 
-# This is the name displayed in DevRev where the Snap-In takes actions using the token of this service account.
 service_account:
-  display_name: DevRev Bot
+  display_name: AskHR Bot
 
-# Add any external connection, reference: https://docs.devrev.ai/snap-ins/concepts#connection.
+## Keyrings — Teams bot credentials stored securely
+keyrings:
+  organization:
+    - name: teams-bot-credentials
+      description: "Microsoft Teams Bot Framework credentials (App ID, App Password, Tenant ID)"
+      display_name: Teams Bot Credentials
+      types:
+        - snap_in_secret
+      is_optional: false
 
-# Add organization level inputs, reference: https://docs.devrev.ai/snap-ins/references/inputs.
+## Inputs — non-secret configuration
 inputs:
   organization:
-    - name: greeting
-      description: Greeting message to be displayed when a work item is created
+    - name: teams_bot_app_id
+      description: "Microsoft Teams Bot App ID (also known as Microsoft App ID)"
       field_type: text
-      default_value: "Hello World"
+      default_value: ""
+      is_required: true
       ui:
-        display_name: Greeting Message
+        display_name: Teams Bot App ID
 
-# Event source reference: https://docs.devrev.ai/snap-ins/references/event_sources#supported-event-source-types-and-their-event-types.
+    - name: teams_bot_tenant_id
+      description: "Azure AD Tenant ID for the Teams bot (for single-tenant bots)"
+      field_type: text
+      default_value: ""
+      is_required: false
+      ui:
+        display_name: Teams Bot Tenant ID
+
+    - name: askhr_agent_id
+      description: "The DevRev AskHR agent DON identifier"
+      field_type: text
+      default_value: "don:core:dvrv-us-1:devo/118bWKFTfx:ai_agent/61"
+      is_required: true
+      ui:
+        display_name: AskHR Agent ID
+
+## Event sources — two-phase async
 event_sources:
   organization:
-    - name: devrev-event-source
-      description: Event source listening on DevRev events.
-      display_name: DevRev events listener
-      type: devrev-webhook
+    - name: teams-inbound
+      description: "Receives inbound messages from Microsoft Teams Bot Framework webhook"
+      display_name: Teams Inbound Webhook
+      type: flow-custom-webhook
       config:
-        event_types:
-          - work_created
+        policy: |
+          // Accept all Teams webhook payloads
+          exports = {
+            response: {
+              status_code: 200,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: "accepted" }),
+            },
+          };
 
-# Functions reference: https://docs.devrev.ai/snap-ins/references/functions.
+    - name: agent-response
+      description: "Receives async responses from the AskHR agent after execute-async"
+      display_name: Agent Response Listener
+      type: flow-custom-webhook
+      config:
+        policy: |
+          exports = {
+            response: {
+              status_code: 200,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: "accepted" }),
+            },
+          };
+
+## Functions
 functions:
-  - name: on_work_creation
-    description: function to trigger on work creation
+  - name: handle_teams_message
+    description: "Parses Teams inbound activity, resolves employee context, and dispatches to AskHR agent via execute-async"
 
-# Automations reference: https://docs.devrev.ai/snap-ins/concepts#automation.
+  - name: handle_agent_response
+    description: "Extracts agent reply, rebuilds Teams reply context from client_metadata, and sends response back to Teams"
+
+## Automations — wire event sources to functions
 automations:
-  - name: handle-work-created-event
-    source: devrev-event-source
+  - name: on-teams-inbound
+    source: teams-inbound
     event_types:
-      - work_created
-    function: on_work_creation
+      - custom:action
+    function: handle_teams_message
+
+  - name: on-agent-response
+    source: agent-response
+    event_types:
+      - custom:action
+    function: handle_agent_response
