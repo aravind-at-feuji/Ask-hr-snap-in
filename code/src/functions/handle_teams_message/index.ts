@@ -31,15 +31,28 @@ export async function handleEvent(event: any): Promise<void> {
     const teamsTenantId = keyrings["teams-bot-tenant-id"]?.secret ?? "";
 
     // Configuration inputs (non-secret)
-    const inputData = event.input_data.global_values ?? {};
+    const inputData = event.input_data?.global_values ?? {};
     const agentId =
       inputData.askhr_agent_id ??
       "don:core:dvrv-us-1:devo/118bWKFTfx:ai_agent/61";
 
-    // The agent-response event source URL for the callback
-    // This is derived from event source config in the snap-in
-    const agentResponseUrl =
-      event.execution_metadata?.event_sources?.["agent-response"]?.webhook_url ?? "";
+    // Extract event source mapping for agent-response
+    const eventSources = event.input_data?.event_sources ?? {};
+    console.log(`[handle_teams_message] Input event sources: ${JSON.stringify(eventSources)}`);
+    console.log(
+      "[handle_teams_message] agent-response event source (full):",
+      JSON.stringify((event.input_data as any)?.event_sources?.["agent-response"])
+    );
+    console.log(
+      "[handle_teams_message] execution_metadata event sources:",
+      JSON.stringify(event.execution_metadata?.event_sources)
+    );
+
+    const agentResponseTarget =
+      eventSources["agent-response"] ??
+      event.execution_metadata?.event_sources?.["agent-response"]?.webhook_url ??
+      event.execution_metadata?.event_sources?.["agent-response"] ??
+      "don:integration:dvrv-us-1:devo/118bWKFTfx:event_source/d523eee8-49d1-4743-a293-e9ac673c5263";
 
     // Parse the inbound payload
     const payload = event.payload ?? {};
@@ -121,7 +134,7 @@ export async function handleEvent(event: any): Promise<void> {
       agentId,
       enrichedMessage,
       replyContext,
-      agentResponseUrl
+      agentResponseTarget
     );
 
     console.log("[handle_teams_message] ===== Dispatch complete. Exiting. =====");

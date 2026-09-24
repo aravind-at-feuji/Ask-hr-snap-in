@@ -1,5 +1,16 @@
 # AskHR Snap-in — Architecture Rule
 
+## ⛔ STRICTLY PROTECTED: Existing Deployed Snap-in (DO NOT TOUCH)
+
+> [!CAUTION]
+> **NEVER EVER touch, update, modify, deactivate, or delete this snap-in under any circumstance.**
+> - **Protected Snap-in ID**: `snap_in-418f45d8-add0-4a75-972c-a8234e19be0f`
+> - **URL**: [DevRev Ask HR Snap-in](https://app.devrev.ai/feuji-partner-demo/settings/snap-ins/snap_in-418f45d8-add0-4a75-972c-a8234e19be0f)
+> - **Reason**: This is an existing deployed production/reference snap-in in the org with a similar name ("Ask HR").
+> - Any development, configuration, testing, upgrade, or deletion operations must strictly target our own active development snap-in instance (e.g. `snap_in-b9a72b3c-dc19-414a-a94a-76c35be8967d`), NEVER `snap_in-418f45d8-add0-4a75-972c-a8234e19be0f`.
+
+---
+
 ## Mandated Architecture: Two-Phase Async
 
 The AskHR snap-in uses a **two-phase asynchronous** design to bridge Microsoft Teams to the DevRev AskHR agent. This is necessary because DevRev's serverless runtime has no persistent HTTP server — a single function cannot wait/poll for the agent reply.
@@ -90,6 +101,33 @@ These are real issues encountered during deployment — follow strictly:
 |-----------------------------|---------|-----|
 | `is_optional` | Not a recognized field on `keyrings` entries | Remove entirely; keyrings are required by default |
 | Missing `service_account.scopes` | Validation error: `service_account.scopes is required by the snap-in to function` | Declare `scopes.self` with required permissions (`dev_user:read`, `ai_agent:read`) |
+| JavaScript in `event_sources.config.policy` | Error: `invalid config policy for custom event source. code not valid` | Must use **Open Policy Agent (Rego)** syntax (`package rego`, `output = {"event": event, "event_key": event_key}`) |
+
+### Valid flow-custom-webhook structure (Rego policy)
+```yaml
+event_sources:
+  organization:
+    - name: teams-inbound
+      description: "Receives inbound messages from Microsoft Teams Bot Framework webhook"
+      display_name: Teams Inbound Webhook
+      type: flow-custom-webhook
+      setup_instructions: |
+        ## Webhook URL
+        `{{source.trigger_url}}`
+      config:
+        policy: |
+          package rego
+
+          output = {"event": event, "event_key": event_key} {
+              input.request.method == "POST"
+              event := input.request.body
+              event_key := "action"
+          } else = {"response": response} {
+              response := {
+                  "status_code": 400
+              }
+          }
+```
 
 ### Valid service_account structure
 ```yaml

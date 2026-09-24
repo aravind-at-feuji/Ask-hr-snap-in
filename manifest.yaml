@@ -3,11 +3,11 @@
 ## Reference: https://developer.devrev.ai/snapin-development/references/manifest
 
 version: "2"
-name: "AskHR"
-description: "Bridges Microsoft Teams to the DevRev AskHR agent. Relays employee HR inquiries with context enrichment and returns real agent responses."
+name: "Feuji AskHR"
+description: "Feuji ASK HR Bridges Microsoft Teams to the DevRev AskHR agent. Relays employee HR inquiries with context enrichment and returns real agent responses."
 
 service_account:
-  display_name: AskHR Bot
+  display_name: Feuji AskHR
   scopes:
     self:
       - scope: dev_user:read
@@ -56,30 +56,45 @@ event_sources:
       description: "Receives inbound messages from Microsoft Teams Bot Framework webhook"
       display_name: Teams Inbound Webhook
       type: flow-custom-webhook
+      setup_instructions: |
+        ## Teams Bot Webhook URL
+        Configure your Azure Bot / Microsoft Teams Bot Framework messaging endpoint with:
+        `{{source.trigger_url}}`
       config:
         policy: |
-          // Accept all Teams webhook payloads
-          exports = {
-            response: {
-              status_code: 200,
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ status: "accepted" }),
-            },
-          };
+          package rego
+
+          output = {"event": event, "event_key": event_key} {
+              input.request.method == "POST"
+              event := input.request.body
+              event_key := "action"
+          } else = {"response": response} {
+              response := {
+                  "status_code": 400
+              }
+          }
 
     - name: agent-response
       description: "Receives async responses from the AskHR agent after execute-async"
       display_name: Agent Response Listener
       type: flow-custom-webhook
+      setup_instructions: |
+        ## Agent Response Listener URL
+        Webhook URL used by the snap-in to receive asynchronous agent responses:
+        `{{source.trigger_url}}`
       config:
         policy: |
-          exports = {
-            response: {
-              status_code: 200,
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ status: "accepted" }),
-            },
-          };
+          package rego
+
+          output = {"event": event, "event_key": event_key} {
+              input.request.method == "POST"
+              event := input.request.body
+              event_key := "action"
+          } else = {"response": response} {
+              response := {
+                  "status_code": 400
+              }
+          }
 
 ## Functions
 functions:

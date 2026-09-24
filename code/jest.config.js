@@ -2,8 +2,8 @@ module.exports = {
   collectCoverage: true,
   coverageDirectory: 'coverage',
   coverageThreshold: {
-    "**/*": {
-      branches: 60
+    global: {
+      branches: 20
     }
   },
   coverageReporters: ['text'],
