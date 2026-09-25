@@ -41,8 +41,16 @@ export async function handleEvent(event: any): Promise<void> {
       inputData.agent_response_webhook_id ??
       "don:integration:dvrv-us-1:devo/118bWKFTfx:webhook/vb-FYlRa";
 
+    // DevRev token for agent dispatch: use PAT if configured, otherwise fallback to service account
+    const devrevPat = (inputData.devrev_pat ?? "").trim();
+    const agentToken = devrevPat || event.context.secrets.service_account_token;
+    const directoryToken = event.context.secrets.service_account_token;
+
     console.log(
       `[handle_teams_message] agentResponseWebhookId: "${agentResponseWebhookId}"`
+    );
+    console.log(
+      `[handle_teams_message] Agent dispatch token source: ${devrevPat ? "configured PAT" : "service account"}`
     );
 
 
@@ -103,7 +111,7 @@ export async function handleEvent(event: any): Promise<void> {
     let resolvedEmail: string | undefined = fromEmail;
     if (!resolvedEmail) {
       console.log(`[handle_teams_message] Email not in payload — resolving via DevRev users directory`);
-      const lookup = await resolveEmailByName(devrevEndpoint, devrevToken, fromName);
+      const lookup = await resolveEmailByName(devrevEndpoint, directoryToken, fromName);
       resolvedEmail = lookup.email;
       console.log(
         `[handle_teams_message] Email lookup result: ${
@@ -124,7 +132,7 @@ export async function handleEvent(event: any): Promise<void> {
     );
     await dispatchToAgent(
       devrevEndpoint,
-      devrevToken,
+      agentToken,
       agentId,
       enrichedMessage,
       replyContext,
