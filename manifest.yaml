@@ -15,6 +15,9 @@ service_account:
         reason: "Search DevRev users directory to resolve employee email from Teams sender name"
       - scope: ai_agent:read
         optional: false
+        reason: "Read AI agent information"
+      - scope: ai_agent:write
+        optional: false
         reason: "Invoke the AskHR agent via execute-async"
 
 ## Keyrings — all sensitive credentials stored securely
@@ -48,6 +51,14 @@ inputs:
       is_required: true
       ui:
         display_name: AskHR Agent ID
+
+    - name: agent_response_webhook_id
+      description: "DevRev Webhook DON pointing to the agent-response event source"
+      field_type: text
+      default_value: "don:integration:dvrv-us-1:devo/118bWKFTfx:webhook/vb-FYlRa"
+      is_required: false
+      ui:
+        display_name: Agent Response Webhook ID
 
 ## Event sources — two-phase async
 event_sources:

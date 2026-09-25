@@ -23,20 +23,9 @@ describe("formatWebhookDon", () => {
 });
 
 describe("configureCallbackTarget", () => {
-  const TEST_EVENT_SOURCE =
-    "don:integration:dvrv-us-1:devo/118bWKFTfx:event_source/d523eee8-49d1-4743-a293-e9ac673c5263";
   const TEST_WEBHOOK =
-    "don:integration:dvrv-us-1:devo/118bWKFTfx:webhook/d523eee8-49d1-4743-a293-e9ac673c5263";
-
-  it("configures event_source_target when target is an event_source DON", () => {
-    const payload: any = {};
-    configureCallbackTarget(payload, TEST_EVENT_SOURCE);
-    expect(payload.target).toBe("event_source_target");
-    expect(payload.event_source_target).toEqual({
-      event_source: TEST_EVENT_SOURCE,
-    });
-    expect(payload.webhook_target).toBeUndefined();
-  });
+    "don:integration:dvrv-us-1:devo/118bWKFTfx:webhook/vb-FYlRa";
+  const TEST_BARE_ID = "vb-FYlRa";
 
   it("configures webhook_target when target is a webhook DON", () => {
     const payload: any = {};
@@ -48,15 +37,14 @@ describe("configureCallbackTarget", () => {
     expect(payload.event_source_target).toBeUndefined();
   });
 
-  it("configures event_source_target when target is an event-source webhook URL", () => {
+  it("configures webhook_target when target is a bare webhook ID", () => {
     const payload: any = {};
-    const url =
-      "https://api.devrev.ai/hidden/dev-orgs/DEV-118bWKFTfx/event-source-webhooks/custom/d523eee8-49d1-4743-a293-e9ac673c5263";
-    configureCallbackTarget(payload, url);
-    expect(payload.target).toBe("event_source_target");
-    expect(payload.event_source_target).toEqual({
-      event_source: TEST_EVENT_SOURCE,
+    configureCallbackTarget(payload, TEST_BARE_ID, "118bWKFTfx");
+    expect(payload.target).toBe("webhook_target");
+    expect(payload.webhook_target).toEqual({
+      webhook: TEST_WEBHOOK,
     });
+    expect(payload.event_source_target).toBeUndefined();
   });
 
   it("does nothing if target is empty", () => {

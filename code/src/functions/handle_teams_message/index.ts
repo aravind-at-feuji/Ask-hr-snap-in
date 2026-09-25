@@ -36,26 +36,13 @@ export async function handleEvent(event: any): Promise<void> {
       inputData.askhr_agent_id ??
       "don:core:dvrv-us-1:devo/118bWKFTfx:ai_agent/61";
 
-    // Extract the webhook URL for the agent-response event source.
-    // The "agent-response" event source is a flow-custom-webhook, which exposes
-    // its inbound URL in execution_metadata.event_sources["agent-response"].webhook_url.
-    // We pass this URL as the webhook_target for the execute-async callback.
-    const agentResponseEventSource =
-      event.execution_metadata?.event_sources?.["agent-response"] ??
-      event.input_data?.event_sources?.["agent-response"] ??
-      {};
-
-    // Prefer the webhook_url exposed by the runtime; fall back to trigger_url.
-    const agentResponseTarget: string =
-      agentResponseEventSource.webhook_url ??
-      agentResponseEventSource.trigger_url ??
-      "";
+    // Webhook DON pointing to the agent-response event source for execute-async callback
+    const agentResponseWebhookId: string =
+      inputData.agent_response_webhook_id ??
+      "don:integration:dvrv-us-1:devo/118bWKFTfx:webhook/vb-FYlRa";
 
     console.log(
-      `[handle_teams_message] agent-response event source object: ${JSON.stringify(agentResponseEventSource)}`
-    );
-    console.log(
-      `[handle_teams_message] agentResponseTarget resolved to: "${agentResponseTarget}"`
+      `[handle_teams_message] agentResponseWebhookId: "${agentResponseWebhookId}"`
     );
 
 
@@ -132,21 +119,16 @@ export async function handleEvent(event: any): Promise<void> {
     console.log(`[handle_teams_message] Enriched message built (${enrichedMessage.length} chars)`);
 
     // Dispatch to agent via execute-async — then exit immediately
-    if (!agentResponseTarget) {
-      console.warn(
-        "[handle_teams_message] WARNING: agentResponseTarget is empty. " +
-          "The agent response callback URL was NOT found in event source metadata. " +
-          "Dispatching without a callback target — responses will NOT be delivered to Teams."
-      );
-    }
-    console.log(`[handle_teams_message] Dispatching to agent: ${agentId}`);
+    console.log(
+      `[handle_teams_message] Dispatching to agent: ${agentId} with callback webhook: ${agentResponseWebhookId}`
+    );
     await dispatchToAgent(
       devrevEndpoint,
       devrevToken,
       agentId,
       enrichedMessage,
       replyContext,
-      agentResponseTarget || undefined
+      agentResponseWebhookId
     );
 
     console.log("[handle_teams_message] ===== Dispatch complete. Exiting. =====");

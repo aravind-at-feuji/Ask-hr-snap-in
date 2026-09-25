@@ -13,7 +13,7 @@ import { TeamsReplyContext } from "./types";
  * Strictly preserves genuine webhook DONs.
  * Does NOT fabricate webhook DONs from event sources.
  */
-export function formatWebhookDon(target: string, devOrgId?: string): string {
+export function formatWebhookDon(target: string, devOrgId: string = "118bWKFTfx"): string {
   if (!target) return "";
 
   // 1. If already a valid webhook DON, return as is
@@ -21,8 +21,8 @@ export function formatWebhookDon(target: string, devOrgId?: string): string {
     return target;
   }
 
-  // 2. If devOrgId is provided and target is a bare webhook ID
-  if (devOrgId && !target.startsWith("don:") && !target.startsWith("http")) {
+  // 2. If target is a bare webhook ID
+  if (!target.startsWith("don:") && !target.startsWith("http")) {
     return `don:integration:dvrv-us-1:devo/${devOrgId}:webhook/${target}`;
   }
 
@@ -32,54 +32,18 @@ export function formatWebhookDon(target: string, devOrgId?: string): string {
 /**
  * Configure callback target on the execute-async request payload
  * conforming strictly to DevRev's execute-async schema:
- * - If target is an event_source DON: use target = 'event_source_target' and event_source_target = { event_source: target }
- * - If target is a webhook DON: use target = 'webhook_target' and webhook_target = { webhook: target }
- * - If target is a URL: determine event_source or webhook URL and configure accordingly
+ * target = 'webhook_target'
+ * webhook_target = { webhook: webhookDon }
  */
-export function configureCallbackTarget(payload: any, target: string): void {
+export function configureCallbackTarget(payload: any, target: string, devOrgId?: string): void {
   if (!target) return;
 
-  if (target.includes(":event_source/")) {
-    payload.target = "event_source_target";
-    payload.event_source_target = {
-      event_source: target,
-    };
-    console.log(`[agent-client] Configured event_source_target: ${target}`);
-  } else if (target.includes(":webhook/")) {
-    payload.target = "webhook_target";
-    payload.webhook_target = {
-      webhook: target,
-    };
-    console.log(`[agent-client] Configured webhook_target: ${target}`);
-  } else if (target.startsWith("http://") || target.startsWith("https://")) {
-    // If a custom event-source-webhooks URL was provided
-    if (target.includes("/event-source-webhooks/")) {
-      const parts = target.split("/").filter(Boolean);
-      const id = parts[parts.length - 1];
-      const devoMatch = target.match(/\/dev-orgs\/(?:DEV-)?([^\/]+)\//);
-      if (devoMatch) {
-        const eventSourceDon = `don:integration:dvrv-us-1:devo/${devoMatch[1]}:event_source/${id}`;
-        payload.target = "event_source_target";
-        payload.event_source_target = {
-          event_source: eventSourceDon,
-        };
-        console.log(`[agent-client] Derived event_source_target from URL: ${eventSourceDon}`);
-        return;
-      }
-    }
-    payload.target = "webhook_target";
-    payload.webhook_target = {
-      webhook: target,
-    };
-    console.log(`[agent-client] Configured webhook_target with URL: ${target}`);
-  } else {
-    // Default fallback: treat bare DON or ID as event_source_target
-    payload.target = "event_source_target";
-    payload.event_source_target = {
-      event_source: target,
-    };
-    console.log(`[agent-client] Fallback configured event_source_target: ${target}`);
-  }
+  const webhookDon = formatWebhookDon(target, devOrgId);
+  payload.target = "webhook_target";
+  payload.webhook_target = {
+    webhook: webhookDon,
+  };
+  console.log(`[agent-client] Configured webhook_target: ${webhookDon}`);
 }
 
 /**
@@ -135,10 +99,15 @@ export async function dispatchToAgent(
     client_metadata: clientMetadata,
   };
 
-  // Configure callback target if provided
-  if (callbackTarget) {
-    configureCallbackTarget(payload, callbackTarget);
-  }
+  // Extract devOrgId from agentId if available
+  const devoMatch = agentId.match(/devo\/([^:]+)/);
+  const devOrgId = devoMatch ? devoMatch[1] : "118bWKFTfx";
+
+  // Configure callback target (webhook_target)
+  const effectiveCallbackTarget =
+    callbackTarget || `don:integration:dvrv-us-1:devo/${devOrgId}:webhook/vb-FYlRa`;
+
+  configureCallbackTarget(payload, effectiveCallbackTarget, devOrgId);
 
   console.log(`[agent-client] Dispatching to agent ${agentId} via execute-async`);
   console.log(`[agent-client] Message length: ${message.length} chars`);
