@@ -2,6 +2,7 @@ import {
   formatWebhookDon,
   configureCallbackTarget,
   extractAgentResponse,
+  cleanAgentResponseText,
 } from "../src/devrev/agent-client";
 
 describe("formatWebhookDon", () => {
@@ -163,10 +164,109 @@ describe("extractAgentResponse", () => {
     expect(result.clientMetadata["conversation_id"]).toBe("conv-999");
   });
 
+  it("automatically cleans DevRev DON citation links from agent response in extractAgentResponse", () => {
+    const rawAgentText =
+      "Hi Raghava! 😊 For any leave-related concerns, here's who you should reach out to:\n\n" +
+      "1. **Your Reporting Manager** — For leave approvals, planned leave requests, or any immediate leave-related discussions. [<don:core:dvrv-us-1:devo/118bWKFTfx:article/1169>]\n\n" +
+      "2. **HR Team** — For policy clarifications, leave balance issues, or any other leave concerns, you can email the HR team at **hrteam-india@feuji.com** [<don:core:dvrv-us-1:devo/118bWKFTfx:article/1169>]\n\n" +
+      "3. **HRMS (Nicoya)** — For applying or tracking your leaves on the system. [<don:core:dvrv-us-1:devo/118bWKFTfx:article/1169>]\n\n" +
+      "Would you like me to help you with a specific leave concern or raise a ticket with HR on your behalf? 😊";
+
+    const webhookEvent = {
+      type: "ai_agent_response",
+      payload: {
+        ai_agent_response: {
+          agent_response: "message",
+          message: rawAgentText,
+          client_metadata: {
+            conversationId: "conv-123",
+          },
+        },
+      },
+    };
+
+    const result = extractAgentResponse(webhookEvent);
+    expect(result.message).not.toContain("don:core");
+    expect(result.message).not.toContain("[<don:");
+    expect(result.rawMessage).toBe(rawAgentText);
+    expect(result.message).toContain(
+      "1. **Your Reporting Manager** — For leave approvals, planned leave requests, or any immediate leave-related discussions."
+    );
+    expect(result.message).toContain(
+      "2. **HR Team** — For policy clarifications, leave balance issues, or any other leave concerns, you can email the HR team at **hrteam-india@feuji.com**"
+    );
+    expect(result.message).toContain(
+      "3. **HRMS (Nicoya)** — For applying or tracking your leaves on the system."
+    );
+    expect(result.message).toContain(
+      "Would you like me to help you with a specific leave concern or raise a ticket with HR on your behalf? 😊"
+    );
+  });
+
   it("handles empty payload gracefully", () => {
     const result = extractAgentResponse({});
     expect(result.message).toBe("");
     expect(result.isGreeting).toBe(false);
     expect(result.isFinal).toBe(false);
+  });
+});
+
+describe("cleanAgentResponseText", () => {
+  it("cleans standard bracketed DevRev DON citations [<don:...>]", () => {
+    const input =
+      "For leave approvals, planned leave requests, or any immediate leave-related discussions. [<don:core:dvrv-us-1:devo/118bWKFTfx:article/1169>]";
+    const expected =
+      "For leave approvals, planned leave requests, or any immediate leave-related discussions.";
+    expect(cleanAgentResponseText(input)).toBe(expected);
+  });
+
+  it("handles citation before punctuation without leaving trailing space before period", () => {
+    const input =
+      "For leave approvals, planned leave requests, or any immediate leave-related discussions [<don:core:dvrv-us-1:devo/118bWKFTfx:article/1169>].";
+    const expected =
+      "For leave approvals, planned leave requests, or any immediate leave-related discussions.";
+    expect(cleanAgentResponseText(input)).toBe(expected);
+  });
+
+  it("cleans bare square bracketed DONs [don:...]", () => {
+    const input = "Please consult HR policy [don:core:dvrv-us-1:devo/118bWKFTfx:article/1169].";
+    expect(cleanAgentResponseText(input)).toBe("Please consult HR policy.");
+  });
+
+  it("cleans angle-bracketed bare DONs <don:...>", () => {
+    const input = "More information is available at <don:core:dvrv-us-1:devo/118bWKFTfx:article/1169>.";
+    expect(cleanAgentResponseText(input)).toBe("More information is available at.");
+  });
+
+  it("preserves human-readable markdown anchor text while stripping DON link", () => {
+    const input =
+      "Refer to the [Leave Policy](don:core:dvrv-us-1:devo/118bWKFTfx:article/1169) for more information.";
+    expect(cleanAgentResponseText(input)).toBe(
+      "Refer to the Leave Policy for more information."
+    );
+  });
+
+  it("removes numeric/generic citation markdown links entirely", () => {
+    const input =
+      "Refer to the leave policy [1](<don:core:dvrv-us-1:devo/118bWKFTfx:article/1169>).";
+    expect(cleanAgentResponseText(input)).toBe("Refer to the leave policy.");
+  });
+
+  it("removes empty Sources or References header lines left behind", () => {
+    const input =
+      "Here is the leave policy summary.\n\nSources:\n[<don:core:dvrv-us-1:devo/118bWKFTfx:article/1169>]";
+    expect(cleanAgentResponseText(input)).toBe("Here is the leave policy summary.");
+  });
+
+  it("handles multiple citations in a list", () => {
+    const input =
+      "Check with your manager [<don:core:1>], [<don:core:2>].";
+    expect(cleanAgentResponseText(input)).toBe("Check with your manager.");
+  });
+
+  it("returns empty string for null, undefined, or empty text", () => {
+    expect(cleanAgentResponseText("")).toBe("");
+    expect(cleanAgentResponseText(null as any)).toBe("");
+    expect(cleanAgentResponseText(undefined as any)).toBe("");
   });
 });

@@ -157,11 +157,92 @@ export async function dispatchToAgent(
 
 export interface ExtractedAgentResponse {
   message: string;
+  rawMessage?: string;
   clientMetadata: Record<string, string>;
   isGreeting: boolean;
   agentResponseStatus?: string;
   isFinal: boolean;
   errorMessage?: string;
+}
+
+/**
+ * Clean agent response text by stripping DevRev internal DON (DevRev Object Notation)
+ * citations, knowledge article references, and residual citation formatting.
+ *
+ * DevRev AI Agents frequently output RAG citations such as:
+ * - `[<don:core:dvrv-us-1:devo/...:article/1169>]`
+ * - `[don:core:dvrv-us-1:devo/...:article/1169]`
+ * - `<don:core:dvrv-us-1:devo/...:article/1169>`
+ * - `[Article 1169](don:core:...)`
+ *
+ * In Microsoft Teams (and other chat channels), these render as ugly, unclickable
+ * raw DON strings. This function strips them cleanly and normalizes spacing and punctuation.
+ */
+export function cleanAgentResponseText(text: string): string {
+  if (!text || typeof text !== "string") {
+    return "";
+  }
+
+  let cleaned = text;
+
+  // 1. Handle markdown links pointing to DONs, e.g. [Title](don:...) or [1](<don:...>)
+  cleaned = cleaned.replace(
+    /\[([^\]]*)\]\(\s*<?don:[^>)\r\n]+>?\s*\)/gi,
+    (_match, linkText) => {
+      const trimmed = linkText.trim();
+      // If the link text is just a citation label (empty, numbers, 'article', 'source', or a DON itself)
+      if (
+        !trimmed ||
+        /^\d+$/.test(trimmed) ||
+        /^<?don:/i.test(trimmed) ||
+        /^(?:source|article|reference|ref|link)s?(?:\s*#?\d+)?$/i.test(trimmed)
+      ) {
+        return "";
+      }
+      // Otherwise keep the human-readable anchor text (e.g. "Leave Policy")
+      return trimmed;
+    }
+  );
+
+  // 2. Remove bracketed DON citations: [<don:...>], [don:...], [[<don:...>]]
+  // Handles: `[<don:core:dvrv-us-1:devo/118bWKFTfx:article/1169>]`
+  cleaned = cleaned.replace(/\[+\s*<?don:[^>\]\r\n]+>?\s*\]+/gi, "");
+
+  // 3. Remove parenthesized DON citations: (<don:...>) or (don:...)
+  cleaned = cleaned.replace(/\(+\s*<?don:[^>)\r\n]+>?\s*\)+/gi, "");
+
+  // 4. Remove angle-bracketed bare DONs: <don:core:...>
+  cleaned = cleaned.replace(/<\s*don:[^>\s\r\n]+\s*>/gi, "");
+
+  // 5. Remove any remaining bare DON identifiers (e.g. don:core:dvrv-us-1:...)
+  cleaned = cleaned.replace(/\bdon:[a-zA-Z0-9_\-\/:]+\b/gi, "");
+
+  // 6. Clean up trailing citation commas or list artifacts left behind
+  // e.g. "discussions. ," or "discussions, ." or "discussions, ,"
+  cleaned = cleaned.replace(/([.?!])[ \t]*,+/g, "$1");
+  cleaned = cleaned.replace(/,+[ \t]*([.?!])/g, "$1");
+  cleaned = cleaned.replace(/,\s*,/g, ",");
+  cleaned = cleaned.replace(/,[ \t]*$/gm, "");
+
+  // 7. Clean up spaces before punctuation marks (e.g. "approved ." -> "approved.")
+  cleaned = cleaned.replace(/[^\S\r\n]+([.,;?!])/g, "$1");
+
+  // 8. Collapse duplicate periods (e.g. "approved. .") while preserving ellipsis "..."
+  cleaned = cleaned.replace(/(?<!\.)\.\s*\.(?!\.)/g, ".");
+
+  // 9. Clean up empty "Source:" or "References:" lines left behind
+  cleaned = cleaned.replace(/^[ \t]*(?:sources?|references?):?[ \t]*$/gim, "");
+
+  // 10. Normalize horizontal spaces (collapse 2+ spaces to 1, without affecting newlines)
+  cleaned = cleaned.replace(/[^\S\r\n]{2,}/g, " ");
+
+  // 11. Trim whitespace at the end of each line
+  cleaned = cleaned.replace(/[^\S\r\n]+$/gm, "");
+
+  // 12. Normalize multiple empty lines (limit consecutive newlines to 2)
+  cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
+
+  return cleaned.trim();
 }
 
 /**
@@ -257,7 +338,14 @@ export function extractAgentResponse(rawPayload: any): ExtractedAgentResponse {
       "";
   }
 
-  const message = typeof extractedText === "string" ? extractedText.trim() : "";
+  const rawMessage = typeof extractedText === "string" ? extractedText.trim() : "";
+  const message = cleanAgentResponseText(rawMessage);
+
+  if (rawMessage.length > 0 && rawMessage.length !== message.length) {
+    console.log(
+      `[agent-client] Cleaned agent response (stripped DON citations/links, length ${rawMessage.length} -> ${message.length})`
+    );
+  }
 
   // Extract client metadata (handling nested paths and case variations)
   const rawMetadata =
@@ -310,6 +398,7 @@ export function extractAgentResponse(rawPayload: any): ExtractedAgentResponse {
 
   return {
     message,
+    rawMessage,
     clientMetadata,
     isGreeting,
     agentResponseStatus,
