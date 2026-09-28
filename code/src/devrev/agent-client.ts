@@ -155,39 +155,167 @@ export async function dispatchToAgent(
   }
 }
 
-/**
- * Extract the agent's reply message from the agent-response event payload.
- */
-export function extractAgentResponse(payload: any): {
+export interface ExtractedAgentResponse {
   message: string;
   clientMetadata: Record<string, string>;
   isGreeting: boolean;
-} {
-  // Extract reply text from various possible locations in the agent response payload
-  const message =
+  agentResponseStatus?: string;
+  isFinal: boolean;
+  errorMessage?: string;
+}
+
+/**
+ * Extract the agent's reply message from the agent-response event payload.
+ *
+ * In DevRev's execute-async architecture, the agent response callback webhook
+ * delivers events with type `ai_agent_response`.
+ * The payload structure is typically:
+ * {
+ *   "type": "ai_agent_response",
+ *   "payload": {
+ *     "ai_agent_response": {
+ *       "agent_response": "message", // "message" for final, or intermediate status
+ *       "message": "...",            // real agent text
+ *       "client_metadata": { ... }   // Teams reply context
+ *     }
+ *   }
+ * }
+ */
+export function extractAgentResponse(rawPayload: any): ExtractedAgentResponse {
+  let payload = rawPayload;
+  if (typeof payload === "string") {
+    try {
+      payload = JSON.parse(payload);
+    } catch {
+      // ignore
+    }
+  }
+
+  // If passed the entire event wrapper, unwrap to payload
+  if (
+    payload &&
+    payload.payload &&
+    (payload.context || payload.execution_metadata || payload.input_data)
+  ) {
+    payload = payload.payload;
+  }
+
+  if (typeof payload === "string") {
+    try {
+      payload = JSON.parse(payload);
+    } catch {
+      // ignore
+    }
+  }
+
+  // Locate the ai_agent_response container across standard DevRev paths
+  const aiAgentResp =
+    payload?.payload?.ai_agent_response ??
+    payload?.ai_agent_response ??
+    payload?.data?.ai_agent_response ??
+    payload?.payload ??
+    payload?.data ??
+    payload;
+
+  // Extract response status (e.g. "message", "thought", "error", etc.)
+  const agentResponseStatus: string | undefined =
+    aiAgentResp?.agent_response ??
+    payload?.payload?.ai_agent_response?.agent_response ??
+    payload?.ai_agent_response?.agent_response ??
+    payload?.agent_response ??
+    payload?.type;
+
+  // Extract error message if present
+  const errorMessage: string | undefined =
+    aiAgentResp?.error?.message ??
+    aiAgentResp?.error?.error ??
+    (typeof aiAgentResp?.error === "string" ? aiAgentResp.error : undefined) ??
+    payload?.payload?.ai_agent_response?.error?.message ??
+    payload?.error?.message;
+
+  // Extract reply text from actual DevRev ai_agent_response fields as well as fallback fields
+  let extractedText: any =
+    aiAgentResp?.message ??
+    payload?.payload?.ai_agent_response?.message ??
+    payload?.ai_agent_response?.message ??
+    payload?.data?.ai_agent_response?.message ??
     payload?.event?.output_message?.message ??
     payload?.output_message?.message ??
     payload?.message ??
     payload?.data?.message ??
     payload?.response?.message ??
+    aiAgentResp?.text ??
+    payload?.text ??
     "";
 
-  const clientMetadata =
+  if (typeof extractedText === "object" && extractedText !== null) {
+    extractedText =
+      extractedText.message ??
+      extractedText.text ??
+      extractedText.content ??
+      extractedText.value ??
+      "";
+  }
+
+  const message = typeof extractedText === "string" ? extractedText.trim() : "";
+
+  // Extract client metadata (handling nested paths and case variations)
+  const rawMetadata =
+    aiAgentResp?.client_metadata ??
+    aiAgentResp?.clientMetadata ??
+    payload?.payload?.ai_agent_response?.client_metadata ??
+    payload?.payload?.ai_agent_response?.clientMetadata ??
+    payload?.ai_agent_response?.client_metadata ??
+    payload?.ai_agent_response?.clientMetadata ??
     payload?.client_metadata ??
+    payload?.clientMetadata ??
     payload?.data?.client_metadata ??
+    payload?.data?.clientMetadata ??
     payload?.event?.client_metadata ??
+    payload?.metadata ??
     {};
+
+  const clientMetadata: Record<string, string> = {};
+  if (typeof rawMetadata === "object" && rawMetadata !== null) {
+    for (const [key, value] of Object.entries(rawMetadata)) {
+      if (typeof value === "string") {
+        clientMetadata[key] = value;
+      } else if (value !== undefined && value !== null) {
+        clientMetadata[key] = String(value);
+      }
+    }
+  }
 
   // Detect greeting: check if flagged or matches greeting patterns
   const isGreeting =
     payload?.is_greeting === true ||
     payload?.data?.is_greeting === true ||
+    aiAgentResp?.is_greeting === true ||
     detectGreeting(message);
 
-  console.log(`[agent-client] Extracted agent response: ${message.substring(0, 200)}...`);
+  // Determine if this is the final complete message event:
+  // In DevRev execute-async callbacks, final response has agent_response === "message"
+  // (or message is non-empty when status is absent).
+  // Intermediate events (like thought/action/stream_start) or empty messages are NOT final.
+  const isFinal =
+    (agentResponseStatus === "message" || !agentResponseStatus) &&
+    message.length > 0 &&
+    !errorMessage &&
+    agentResponseStatus !== "error";
+
+  console.log(
+    `[agent-client] Extracted agent response: status="${agentResponseStatus ?? "unknown"}", isFinal=${isFinal}, messageLength=${message.length}, text="${message.substring(0, 200)}..."`
+  );
   console.log(`[agent-client] Is greeting: ${isGreeting}`);
 
-  return { message, clientMetadata, isGreeting };
+  return {
+    message,
+    clientMetadata,
+    isGreeting,
+    agentResponseStatus,
+    isFinal,
+    errorMessage,
+  };
 }
 
 /**

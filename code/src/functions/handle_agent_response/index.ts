@@ -23,6 +23,19 @@ export async function handleEvent(event: any): Promise<void> {
   console.log("[handle_agent_response] ===== Agent response received =====");
 
   try {
+    // 1. Log the FULL raw callback payload so we can inspect the exact structure from DevRev.
+    // Redact secret values in keyrings to ensure security compliance.
+    const safeEvent = { ...event };
+    if (safeEvent.input_data?.keyrings) {
+      const safeKeyrings: Record<string, any> = {};
+      for (const [k, v] of Object.entries(safeEvent.input_data.keyrings as Record<string, any>)) {
+        safeKeyrings[k] = { ...v, secret: v.secret ? "***REDACTED***" : undefined };
+      }
+      safeEvent.input_data = { ...safeEvent.input_data, keyrings: safeKeyrings };
+    }
+    console.log(`[handle_agent_response] FULL raw event: ${JSON.stringify(safeEvent)}`);
+    console.log(`[handle_agent_response] FULL raw callback payload: ${JSON.stringify(event?.payload)}`);
+
     // Extract secrets and configuration from keyrings
     const keyrings = event.input_data?.keyrings ?? {};
     const inputData = event.input_data?.global_values ?? {};
@@ -31,33 +44,55 @@ export async function handleEvent(event: any): Promise<void> {
     const teamsAppId = keyrings["teams-bot-app-id"]?.secret ?? inputData.teams_bot_app_id ?? "";
     const teamsTenantId = keyrings["teams-bot-tenant-id"]?.secret ?? inputData.teams_bot_tenant_id ?? "";
 
-    // Extract the agent response payload
-    const payload = event.payload ?? {};
-    const agentPayload = payload.data ?? payload;
+    // Extract the agent response from the actual payload structure
+    const {
+      message,
+      clientMetadata,
+      isGreeting,
+      agentResponseStatus,
+      isFinal,
+      errorMessage,
+    } = extractAgentResponse(event.payload ?? event);
 
-    const { message, clientMetadata, isGreeting } =
-      extractAgentResponse(agentPayload);
-
-    if (!message) {
-      console.log("[handle_agent_response] Empty agent response — ignoring");
+    // If agent sent an explicit error
+    if (agentResponseStatus === "error" || errorMessage) {
+      console.error(
+        `[handle_agent_response] Agent reported error: ${errorMessage || "Unknown error"}. Skipping.`
+      );
       return;
     }
 
+    // Ignore intermediate / streaming / non-final events without treating as failure
+    if (!isFinal || !message) {
+      console.log(
+        `[handle_agent_response] Intermediate/non-final event received (status: "${agentResponseStatus ?? "none"}", messageLength: ${message.length}). Ignoring and awaiting final message.`
+      );
+      return;
+    }
+
+    console.log(
+      `[handle_agent_response] Final message extracted successfully! Status: "${agentResponseStatus ?? "message"}"`
+    );
     console.log(
       `[handle_agent_response] Agent reply (first 200 chars): "${message.substring(0, 200)}"`
     );
     console.log(`[handle_agent_response] Is greeting: ${isGreeting}`);
 
-    // Reconstruct Teams reply context from client_metadata
+    // Reconstruct Teams reply context from client_metadata (supports camelCase and snake_case)
+    let serviceUrl = clientMetadata["serviceUrl"] ?? clientMetadata["service_url"] ?? "";
+    if (serviceUrl && !serviceUrl.endsWith("/")) {
+      serviceUrl += "/";
+    }
+
     const replyContext: TeamsReplyContext = {
-      serviceUrl: clientMetadata["serviceUrl"] ?? "",
-      conversationId: clientMetadata["conversationId"] ?? "",
-      tenantId: clientMetadata["tenantId"] ?? teamsTenantId,
-      botId: clientMetadata["botId"] ?? teamsAppId,
-      botName: clientMetadata["botName"] ?? "AskHR",
-      recipientId: clientMetadata["recipientId"] ?? "",
-      recipientName: clientMetadata["recipientName"] ?? "",
-      activityId: clientMetadata["activityId"],
+      serviceUrl,
+      conversationId: clientMetadata["conversationId"] ?? clientMetadata["conversation_id"] ?? "",
+      tenantId: clientMetadata["tenantId"] ?? clientMetadata["tenant_id"] ?? teamsTenantId,
+      botId: clientMetadata["botId"] ?? clientMetadata["bot_id"] ?? teamsAppId,
+      botName: clientMetadata["botName"] ?? clientMetadata["bot_name"] ?? "AskHR",
+      recipientId: clientMetadata["recipientId"] ?? clientMetadata["recipient_id"] ?? "",
+      recipientName: clientMetadata["recipientName"] ?? clientMetadata["recipient_name"] ?? "",
+      activityId: clientMetadata["activityId"] ?? clientMetadata["activity_id"],
     };
 
     if (!replyContext.serviceUrl || !replyContext.conversationId) {
@@ -66,6 +101,9 @@ export async function handleEvent(event: any): Promise<void> {
       );
       console.error(
         `[handle_agent_response] serviceUrl: "${replyContext.serviceUrl}", conversationId: "${replyContext.conversationId}"`
+      );
+      console.error(
+        `[handle_agent_response] clientMetadata received: ${JSON.stringify(clientMetadata)}`
       );
       return;
     }
