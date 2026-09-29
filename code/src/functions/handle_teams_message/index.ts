@@ -106,9 +106,17 @@ export async function handleEvent(event: any): Promise<void> {
 
     // Extract sender information
     const fromName = teamsActivity.from?.name ?? "Unknown";
-    const fromEmail = teamsActivity.from?.aadObjectId ? undefined : undefined; // Teams doesn't reliably provide email
+    const fromEmail =
+      teamsActivity.from?.email ||
+      teamsActivity.from?.userPrincipalName ||
+      undefined;
+    const aadObjectId = teamsActivity.from?.aadObjectId;
 
-    console.log(`[handle_teams_message] From: ${fromName}, ConversationId: ${teamsActivity.conversation?.id}`);
+    console.log(
+      `[handle_teams_message] From: ${fromName} (aadObjectId: ${aadObjectId ?? "none"}, email: ${
+        fromEmail ?? "none"
+      }), ConversationId: ${teamsActivity.conversation?.id}`
+    );
 
     // Build Teams reply context for the round-trip
     const replyContext: TeamsReplyContext = {
@@ -138,11 +146,13 @@ export async function handleEvent(event: any): Promise<void> {
     let resolvedEmail: string | undefined = fromEmail;
     if (!resolvedEmail) {
       console.log(`[handle_teams_message] Email not in payload — resolving via DevRev users directory`);
-      const lookup = await resolveEmailByName(devrevEndpoint, directoryToken, fromName);
+      const lookup = await resolveEmailByName(devrevEndpoint, directoryToken, fromName, {
+        aadObjectId,
+      });
       resolvedEmail = lookup.email;
       console.log(
         `[handle_teams_message] Email lookup result: ${
-          resolvedEmail ? "resolved" : `not resolved (${lookup.matchCount} matches)`
+          resolvedEmail ? `resolved (${resolvedEmail})` : `not resolved (${lookup.matchCount} matches)`
         }`
       );
     }
