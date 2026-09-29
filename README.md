@@ -74,24 +74,68 @@ The DevRev service account token is automatically provisioned.
 │           └── agent_response_event.json   # Test: agent response
 ```
 
-## Deploy
+## Deploy & Upgrade
+
+### 1. Upgrading an Existing Active Snap-in (Recommended)
+
+When you make changes to the code or manifest, upgrade the existing active version in-place so that your **webhook URLs, active instance, and keyrings remain unchanged**:
+
+#### Step 1: Find your existing Version ID / DON
+Run this in PowerShell to retrieve the active version ID specifically for **Feuji AskHR**:
+```powershell
+devrev snap_in list | ForEach-Object {
+    $s = $_ | ConvertFrom-Json
+    if ($s.name -eq "Feuji AskHR") {
+        [PSCustomObject]@{
+            Name             = $s.name
+            SnapInId         = $s.id
+            Status           = $s.status
+            VersionDON       = $s.snap_in_version.id
+            VersionDisplayId = $s.snap_in_version.display_id
+        }
+    }
+} | Format-List
+```
+
+#### Step 2: Build the code
+```bash
+cd code
+npm run build
+cd ..
+```
+
+#### Step 3: Upgrade the active version in-place
+Run from `devrev-snaps-typescript-template` (where `manifest.yaml` is located):
+```bash
+devrev snap_in_version upgrade "<SNAP_IN_VERSION_DON>" --path .
+```
+*(Example: `devrev snap_in_version upgrade "don:integration:dvrv-us-1:devo/118bWKFTfx:snap_in_package/052dfefe-34e1-4c85-a17d-495f0c22ba5c:snap_in_version/d1e99c80-46fe-4ee4-b4cc-3f303954dbdd" --path .`)*
+
+Your active **Feuji AskHR** instance immediately runs the new code without changing its webhook URLs.
+
+---
+
+### 2. Initial Deployment (First-Time Setup Only)
+
+If deploying a new snap-in from scratch:
 
 ```bash
 # 1. Install dependencies and build
 cd code
 npm install
 npm run build
+cd ..
 
 # 2. Create snap-in version (creates package on first run)
 devrev snap_in_version create-one --path . --create-package
 
-# 3. Draft → Update → Activate
+# 3. Draft → Update → Activate (Creates a NEW instance)
 devrev snap_in draft
 devrev snap_in update
 devrev snap_in activate
 ```
 
-After activation, configure the **Teams bot messaging endpoint** to point to the `teams-inbound` event source URL (visible in DevRev snap-in settings).
+After initial activation, copy the `teams-inbound` event source URL from DevRev Snap-in Settings and set it as the **Messaging endpoint** in your Azure Bot registration.
 
 ## Testing Outside Teams (Real Responses)
 

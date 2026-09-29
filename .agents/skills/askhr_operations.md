@@ -17,13 +17,11 @@ When you need to add a new topic to the greeting card's 18-topic dropdown.
    - Use the `teams_inbound_message.json` fixture to trigger a greeting.
    - Verify the new topic appears in the Adaptive Card dropdown in the snap-in logs.
 
-4. **Deploy**:
+4. **Deploy / Upgrade**:
    ```bash
    cd code && npm run build
-   devrev snap_in_version create-one --path . --create-package
-   devrev snap_in draft
-   devrev snap_in update
-   devrev snap_in activate
+   cd ..
+   devrev snap_in_version upgrade "<SNAP_IN_VERSION_DON>" --path .
    ```
 
 ---
@@ -37,25 +35,25 @@ When the Microsoft Teams bot app password (client secret) needs rotation.
 
 1. **Generate new secret** in Azure Portal → App Registrations → Your Bot → Certificates & secrets → New client secret.
 2. **Update the keyring** in DevRev:
-   - Go to DevRev Settings → Snap-ins → AskHR → Configuration.
+   - Go to DevRev Settings → Snap-ins → Feuji AskHR → Configuration.
    - Update the `Teams Bot Credentials` keyring with the new secret.
 3. **Verify**: Send a test message in Teams and check snap-in logs for successful token acquisition.
 4. No code changes or redeployment needed — keyrings are read at runtime.
 
 ---
 
-# Redeploy & Test
+# Redeploy & Upgrade
 
-## Build and Deploy
+## Build and Upgrade Existing Version In-Place
 
 ```bash
 cd code
 npm install
 npm run build
-devrev snap_in_version create-one --path . --create-package
-devrev snap_in draft
-devrev snap_in update
-devrev snap_in activate
+cd ..
+
+# Upgrade existing version in-place:
+devrev snap_in_version upgrade "<SNAP_IN_VERSION_DON>" --path .
 ```
 
 ## Test Outside Teams (Real Responses)

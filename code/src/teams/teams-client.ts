@@ -34,19 +34,43 @@ export const HR_TOPICS = [
   "Employee Letters",
 ];
 
+interface CachedToken {
+  token: string;
+  expiresAt: number;
+}
+
+const botTokenCache = new Map<string, CachedToken>();
+
+/**
+ * Clear the Bot Framework token cache (useful for testing).
+ */
+export function clearBotTokenCache(): void {
+  botTokenCache.clear();
+}
+
 /**
  * Acquire a Bot Framework OAuth token using client credentials.
+ * Caches the token in memory according to its expires_in lifespan.
  */
 export async function acquireBotToken(
   appId: string,
   appPassword: string,
   tenantId: string
 ): Promise<string> {
+  const cacheKey = `${appId}:${tenantId || "default"}`;
+  const now = Date.now();
+  const cached = botTokenCache.get(cacheKey);
+
+  // Return cached token if valid for at least another 60 seconds
+  if (cached && now < cached.expiresAt - 60000) {
+    return cached.token;
+  }
+
   const tokenUrl = tenantId
     ? BOT_FRAMEWORK_TOKEN_URL_TEMPLATE.replace("{tenantId}", tenantId)
     : BOT_FRAMEWORK_TOKEN_URL_TEMPLATE.replace("{tenantId}", "botframework.com");
 
-  console.log("[teams-client] Acquiring Bot Framework OAuth token...");
+  console.log("[teams-client] Acquiring fresh Bot Framework OAuth token...");
 
   try {
     const params = new URLSearchParams();
@@ -57,16 +81,73 @@ export async function acquireBotToken(
 
     const response = await axios.post(tokenUrl, params.toString(), {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      timeout: 10000,
     });
 
     const token = response.data.access_token;
-    console.log("[teams-client] Bot Framework token acquired successfully");
+    const expiresInSec =
+      typeof response.data.expires_in === "number" ? response.data.expires_in : 3600;
+    botTokenCache.set(cacheKey, {
+      token,
+      expiresAt: now + expiresInSec * 1000,
+    });
+
+    console.log("[teams-client] Bot Framework token acquired and cached successfully");
     return token;
   } catch (error: any) {
     console.error(
       `[teams-client] Failed to acquire Bot Framework token: ${error.message}`
     );
     throw new Error("Failed to acquire Bot Framework OAuth token");
+  }
+}
+
+/**
+ * Send a typing indicator to a Teams conversation.
+ * Displays "AskHR is typing..." in the Teams client to inform the user
+ * that their request is being processed.
+ */
+export async function sendTypingIndicator(
+  botToken: string,
+  replyContext: TeamsReplyContext
+): Promise<void> {
+  if (!replyContext.serviceUrl || !replyContext.conversationId) {
+    return;
+  }
+
+  const url = `${replyContext.serviceUrl}v3/conversations/${replyContext.conversationId}/activities`;
+
+  const activity = {
+    type: "typing",
+    from: {
+      id: replyContext.botId,
+      name: replyContext.botName,
+    },
+    recipient: {
+      id: replyContext.recipientId,
+      name: replyContext.recipientName,
+    },
+  };
+
+  console.log(
+    `[teams-client] Sending typing indicator to conversation ${replyContext.conversationId}`
+  );
+
+  try {
+    await axios.post(url, activity, {
+      headers: {
+        Authorization: `Bearer ${botToken}`,
+        "Content-Type": "application/json",
+      },
+      timeout: 5000,
+    });
+    console.log("[teams-client] Typing indicator sent successfully");
+  } catch (error: any) {
+    // Non-fatal: do not block message flow if typing indicator fails
+    const status = error.response?.status ?? "unknown";
+    console.warn(
+      `[teams-client] Non-fatal: Typing indicator failed (status: ${status}): ${error.message}`
+    );
   }
 }
 

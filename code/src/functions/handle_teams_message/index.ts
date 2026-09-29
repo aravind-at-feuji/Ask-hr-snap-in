@@ -15,6 +15,8 @@
 import { dispatchToAgent } from "../../devrev/agent-client";
 import { resolveEmailByName, buildEmployeeContextHeader } from "../../devrev/users";
 import { TeamsReplyContext } from "../../devrev/types";
+import { checkAndRecordIncomingActivity } from "../../teams/dedup";
+import { acquireBotToken, sendTypingIndicator } from "../../teams/teams-client";
 
 export async function handleEvent(event: any): Promise<void> {
   console.log("[handle_teams_message] ===== Inbound Teams activity received =====");
@@ -89,6 +91,19 @@ export async function handleEvent(event: any): Promise<void> {
       return;
     }
 
+    // Deduplication check: drop duplicate activities caused by Bot Framework retries or rapid double-submits
+    const dedup = checkAndRecordIncomingActivity(
+      teamsActivity.id,
+      teamsActivity.conversation?.id,
+      messageText
+    );
+    if (dedup.isDuplicate) {
+      console.warn(
+        `[handle_teams_message] ${dedup.reason}. Dropping event to prevent duplicate agent responses.`
+      );
+      return;
+    }
+
     // Extract sender information
     const fromName = teamsActivity.from?.name ?? "Unknown";
     const fromEmail = teamsActivity.from?.aadObjectId ? undefined : undefined; // Teams doesn't reliably provide email
@@ -106,6 +121,18 @@ export async function handleEvent(event: any): Promise<void> {
       recipientName: fromName,
       activityId: teamsActivity.id,
     };
+
+    // Send typing indicator to Teams in parallel so user immediately sees "AskHR is typing..."
+    const typingPromise = (async () => {
+      if (replyContext.serviceUrl && replyContext.conversationId && teamsAppId && teamsAppPassword) {
+        try {
+          const botToken = await acquireBotToken(teamsAppId, teamsAppPassword, replyContext.tenantId);
+          await sendTypingIndicator(botToken, replyContext);
+        } catch (typingErr: any) {
+          console.warn(`[handle_teams_message] Typing indicator skipped: ${typingErr.message}`);
+        }
+      }
+    })();
 
     // Step: Resolve employee email by name
     let resolvedEmail: string | undefined = fromEmail;
@@ -138,6 +165,9 @@ export async function handleEvent(event: any): Promise<void> {
       replyContext,
       agentResponseWebhookId
     );
+
+    // Ensure typing indicator network call concludes before function terminates
+    await typingPromise;
 
     console.log("[handle_teams_message] ===== Dispatch complete. Exiting. =====");
   } catch (error: any) {
