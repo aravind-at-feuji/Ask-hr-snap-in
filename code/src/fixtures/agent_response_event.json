@@ -9,9 +9,7 @@
       "devrev_endpoint": "https://api.devrev.ai"
     },
     "input_data": {
-      "global_values": {
-        "askhr_agent_id": "don:core:dvrv-us-1:devo/118bWKFTfx:ai_agent/61"
-      },
+      "global_values": {},
       "keyrings": {
         "teams-app-secret": {
           "secret": "YOUR_TEAMS_BOT_APP_PASSWORD"
@@ -21,6 +19,15 @@
         },
         "teams-bot-tenant-id": {
           "secret": "YOUR_AZURE_TENANT_ID"
+        },
+        "devrev_pat": {
+          "secret": "YOUR_DEVREV_PAT"
+        },
+        "askhr_agent_id": {
+          "secret": "don:core:dvrv-us-1:devo/118bWKFTfx:ai_agent/72"
+        },
+        "agent_response_webhook_id": {
+          "secret": "don:integration:dvrv-us-1:devo/118bWKFTfx:webhook/vb-FYlRa"
         }
       }
     },

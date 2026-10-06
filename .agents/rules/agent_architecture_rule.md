@@ -53,26 +53,30 @@ The snap-in does **NOT** use DevRev conversations or timelines for the Teams ↔
 
 ## Authentication & Service Account Model
 
-The snap-in authenticates to DevRev strictly as a **service account**. DevRev automatically provisions the service account credentials (`event.context.secrets.service_account_token`) at runtime.
+The snap-in authenticates to DevRev using the platform-provisioned **service account** credentials (`event.context.secrets.service_account_token`) for directory queries and agent invocation. When Agent Studio execution requires a personal access token, the optional `devrev_pat` secret stored in keyrings is used.
 
-- **NO DevRev user token (PAT)**: Do not require, store, or accept a DevRev user token anywhere. All DevRev operations (agent invocation, users directory lookup) use the service account token.
+- **DevRev Service Account Token**: Auto-provisioned by the DevRev runtime; used for users directory lookup (`dev-users.list`) and agent invocation when no PAT is provided.
+- **DevRev PAT (`devrev_pat`)**: Stored securely as a keyring (`snap_in_secret`) for authenticated Agent Studio execution. Never hardcoded.
 - **Service account scopes**: Declared under `service_account.scopes.self` in `manifest.yaml`:
   - `dev_user:read`: Query the DevRev users directory (`dev-users.list`) to match employee display names to emails.
-  - `ai_agent:read`: Invoke the AskHR AI agent (`don:core:dvrv-us-1:devo/...:ai_agent/...`) via `ai-agents.events.execute-async`.
+  - `ai_agent:read`: Read AI agent information.
+  - `ai_agent:write`: Invoke the AskHR AI agent (`don:core:dvrv-us-1:devo/...:ai_agent/...`) via `ai-agents.events.execute-async`.
 - **No ticket scopes**: The snap-in does **NOT** create tickets; the agent handles ticket creation via its own workflow.
 
 ---
 
 ## Secrets & Keyrings Model
 
-Keyrings are used **exclusively for external secrets** (Microsoft Teams bot credentials). No DevRev tokens belong in keyrings:
+Keyrings are used for all sensitive credentials, tokens, and target identifiers (`types: [snap_in_secret]`). No sensitive parameters or tokens are stored in plain-text inputs:
 
-| Secret | Storage | Access in Code |
-|--------|---------|----------------|
-| Teams App Password | `keyrings.organization[teams-app-secret]` (type: `snap_in_secret`) | `event.input_data.keyrings["teams-app-secret"].secret` |
-| Teams App ID | `keyrings.organization[teams-bot-app-id]` (type: `snap_in_secret`) | `event.input_data.keyrings["teams-bot-app-id"].secret` |
-| Teams Tenant ID | `keyrings.organization[teams-bot-tenant-id]` (type: `snap_in_secret`) | `event.input_data.keyrings["teams-bot-tenant-id"].secret` |
-| AskHR Agent ID | `inputs.organization[askhr_agent_id]` (field_type: `text`, default provided) | `event.input_data.global_values.askhr_agent_id` |
+| Secret / Keyring | Storage in Manifest | Access in Code |
+|------------------|---------------------|----------------|
+| Teams App Password | `keyrings.organization[teams-app-secret]` (type: `snap_in_secret`) | `event.input_data.keyrings["teams-app-secret"]?.secret` |
+| Teams App ID | `keyrings.organization[teams-bot-app-id]` (type: `snap_in_secret`) | `event.input_data.keyrings["teams-bot-app-id"]?.secret` |
+| Teams Tenant ID | `keyrings.organization[teams-bot-tenant-id]` (type: `snap_in_secret`) | `event.input_data.keyrings["teams-bot-tenant-id"]?.secret` |
+| DevRev PAT Token | `keyrings.organization[devrev_pat]` (type: `snap_in_secret`) | `event.input_data.keyrings["devrev_pat"]?.secret` |
+| AskHR Agent ID | `keyrings.organization[askhr_agent_id]` (type: `snap_in_secret`) | `event.input_data.keyrings["askhr_agent_id"]?.secret` |
+| Agent Response Webhook ID | `keyrings.organization[agent_response_webhook_id]` (type: `snap_in_secret`) | `event.input_data.keyrings["agent_response_webhook_id"]?.secret` |
 | DevRev Service Account Token | Auto-provisioned by DevRev platform | `event.context.secrets.service_account_token` |
 
 **Never** hardcode secrets. **Never** log secret values.

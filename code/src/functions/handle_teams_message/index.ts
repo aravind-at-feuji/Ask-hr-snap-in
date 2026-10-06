@@ -26,25 +26,30 @@ export async function handleEvent(event: any): Promise<void> {
     const devrevToken = event.context.secrets.service_account_token;
     const devrevEndpoint = event.execution_metadata.devrev_endpoint;
 
-    // All Teams credentials from keyrings
+    // Credentials and configuration strictly from keyrings (secrets)
     const keyrings = event.input_data?.keyrings ?? {};
+
     const teamsAppPassword = keyrings["teams-app-secret"]?.secret ?? "";
     const teamsAppId = keyrings["teams-bot-app-id"]?.secret ?? "";
     const teamsTenantId = keyrings["teams-bot-tenant-id"]?.secret ?? "";
 
-    // Configuration inputs (non-secret)
-    const inputData = event.input_data?.global_values ?? {};
     const agentId =
-      inputData.askhr_agent_id ??
-      "don:core:dvrv-us-1:devo/118bWKFTfx:ai_agent/61";
+      keyrings["askhr_agent_id"]?.secret ??
+      keyrings["askhr-agent-id"]?.secret ??
+      "don:core:dvrv-us-1:devo/118bWKFTfx:ai_agent/72";
 
     // Webhook DON pointing to the agent-response event source for execute-async callback
     const agentResponseWebhookId: string =
-      inputData.agent_response_webhook_id ??
+      keyrings["agent_response_webhook_id"]?.secret ??
+      keyrings["agent-response-webhook-id"]?.secret ??
       "don:integration:dvrv-us-1:devo/118bWKFTfx:webhook/vb-FYlRa";
 
-    // DevRev token for agent dispatch: use PAT if configured, otherwise fallback to service account
-    const devrevPat = (inputData.devrev_pat ?? "").trim();
+    // DevRev token for agent dispatch: use PAT if configured in keyrings, otherwise fallback to service account
+    const devrevPat = (
+      keyrings["devrev_pat"]?.secret ??
+      keyrings["devrev-pat"]?.secret ??
+      ""
+    ).trim();
     const agentToken = devrevPat || event.context.secrets.service_account_token;
     const directoryToken = event.context.secrets.service_account_token;
 
@@ -52,7 +57,7 @@ export async function handleEvent(event: any): Promise<void> {
       `[handle_teams_message] agentResponseWebhookId: "${agentResponseWebhookId}"`
     );
     console.log(
-      `[handle_teams_message] Agent dispatch token source: ${devrevPat ? "configured PAT" : "service account"}`
+      `[handle_teams_message] Agent dispatch token source: ${devrevPat ? "configured PAT (keyring)" : "service account"}`
     );
 
 

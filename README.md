@@ -34,14 +34,18 @@ Teams User ◄── Bot Framework REST API ◄── handle_agent_response() �
 
 ## Secrets & Configuration (Provided at Install)
 
+All credentials, tokens, and target IDs are stored securely as **keyrings** (`snap_in_secret`):
+
 | Setting | Type | Description |
 |---------|------|-------------|
-| **Teams Bot Credentials** | Keyring (snap_in_secret) | Microsoft App Password (client secret) |
-| **Teams Bot App ID** | Input (text) | Microsoft App ID for the bot |
-| **Teams Bot Tenant ID** | Input (text, optional) | Azure AD Tenant ID |
-| **AskHR Agent ID** | Input (text) | DevRev agent DON identifier |
+| **Teams App Secret** (`teams-app-secret`) | Keyring (`snap_in_secret`) | Microsoft App Password (client secret) for Teams bot |
+| **Teams Bot App ID** (`teams-bot-app-id`) | Keyring (`snap_in_secret`) | Microsoft App ID (client ID) for Teams bot |
+| **Teams Bot Tenant ID** (`teams-bot-tenant-id`) | Keyring (`snap_in_secret`) | Azure AD Tenant ID for Teams bot |
+| **DevRev PAT Token** (`devrev_pat`) | Keyring (`snap_in_secret`) | Optional DevRev Personal Access Token for Agent Studio |
+| **AskHR Agent ID** (`askhr_agent_id`) | Keyring (`snap_in_secret`) | DevRev AskHR AI agent DON identifier |
+| **Agent Response Webhook ID** (`agent_response_webhook_id`) | Keyring (`snap_in_secret`) | DevRev Webhook DON for async response callback |
 
-The DevRev service account token is automatically provisioned.
+The DevRev service account token is automatically provisioned by the platform runtime.
 
 ## Project Structure
 

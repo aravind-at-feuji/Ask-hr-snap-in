@@ -36,13 +36,12 @@ export async function handleEvent(event: any): Promise<void> {
     console.log(`[handle_agent_response] FULL raw event: ${JSON.stringify(safeEvent)}`);
     console.log(`[handle_agent_response] FULL raw callback payload: ${JSON.stringify(event?.payload)}`);
 
-    // Extract secrets and configuration from keyrings
+    // Extract secrets and configuration strictly from keyrings
     const keyrings = event.input_data?.keyrings ?? {};
-    const inputData = event.input_data?.global_values ?? {};
 
     const teamsAppPassword = keyrings["teams-app-secret"]?.secret ?? "";
-    const teamsAppId = keyrings["teams-bot-app-id"]?.secret ?? inputData.teams_bot_app_id ?? "";
-    const teamsTenantId = keyrings["teams-bot-tenant-id"]?.secret ?? inputData.teams_bot_tenant_id ?? "";
+    const teamsAppId = keyrings["teams-bot-app-id"]?.secret ?? "";
+    const teamsTenantId = keyrings["teams-bot-tenant-id"]?.secret ?? "";
 
     // Extract the agent response from the actual payload structure
     const {
