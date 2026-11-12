@@ -82,7 +82,7 @@ curl -X POST "https://<your-teams-inbound-webhook-url>" \
 [users] Searching DevRev users directory for name="Test User"
 [users] Exactly one match found. Email: (resolved)
 [handle_teams_message] Enriched message built (xxx chars)
-[handle_teams_message] Dispatching to agent: don:core:dvrv-us-1:devo/118bWKFTfx:ai_agent/61
+[handle_teams_message] Dispatching to agent: don:core:dvrv-in-1:devo/2gW4bQiSjj:ai_agent/134
 [agent-client] Dispatching to agent ... via execute-async
 [agent-client] Agent dispatch successful. Status: 200
 [handle_teams_message] ===== Dispatch complete. Exiting. =====

@@ -29,7 +29,7 @@
           "secret": "YOUR_DEVREV_PAT"
         },
         "askhr_agent_id": {
-          "secret": "don:core:dvrv-us-1:devo/118bWKFTfx:ai_agent/72"
+          "secret": "don:core:dvrv-in-1:devo/2gW4bQiSjj:ai_agent/134"
         },
         "agent_response_webhook_id": {
           "secret": "don:integration:dvrv-us-1:devo/118bWKFTfx:webhook/vb-FYlRa"

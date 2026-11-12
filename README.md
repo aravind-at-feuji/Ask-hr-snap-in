@@ -30,7 +30,7 @@ Teams User ◄── Bot Framework REST API ◄── handle_agent_response() �
    - App ID (Microsoft App ID)
    - App Password (Client Secret)
    - Tenant ID (for single-tenant bots)
-4. **AskHR Agent** configured in DevRev (ID: `don:core:dvrv-us-1:devo/118bWKFTfx:ai_agent/61`)
+4. **AskHR Agent** configured in DevRev (ID: `don:core:dvrv-in-1:devo/2gW4bQiSjj:ai_agent/134`)
 
 ## Secrets & Configuration (Provided at Install)
 
@@ -170,7 +170,7 @@ curl -X POST "https://<your-teams-inbound-webhook-url>" \
 [users] Searching DevRev users directory for name="Aravind Induri"
 [users] Exactly one match found. Email: (resolved)
 [handle_teams_message] Enriched message built (xxx chars)
-[handle_teams_message] Dispatching to agent: don:core:dvrv-us-1:devo/118bWKFTfx:ai_agent/61
+[handle_teams_message] Dispatching to agent: don:core:dvrv-in-1:devo/2gW4bQiSjj:ai_agent/134
 [agent-client] Agent dispatch successful. Status: 200
 [handle_teams_message] ===== Dispatch complete. Exiting. =====
 ```

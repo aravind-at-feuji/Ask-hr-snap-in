@@ -33,16 +33,24 @@ export async function handleEvent(event: any): Promise<void> {
     const teamsAppId = keyrings["teams-bot-app-id"]?.secret ?? "";
     const teamsTenantId = keyrings["teams-bot-tenant-id"]?.secret ?? "";
 
-    const agentId =
+    const agentId = (
       keyrings["askhr_agent_id"]?.secret ??
       keyrings["askhr-agent-id"]?.secret ??
-      "don:core:dvrv-us-1:devo/118bWKFTfx:ai_agent/72";
+      ""
+    ).trim();
+    if (!agentId) {
+      throw new Error("[handle_teams_message] Missing required keyring: askhr_agent_id");
+    }
 
     // Webhook DON pointing to the agent-response event source for execute-async callback
-    const agentResponseWebhookId: string =
+    const agentResponseWebhookId = (
       keyrings["agent_response_webhook_id"]?.secret ??
       keyrings["agent-response-webhook-id"]?.secret ??
-      "don:integration:dvrv-us-1:devo/118bWKFTfx:webhook/vb-FYlRa";
+      ""
+    ).trim();
+    if (!agentResponseWebhookId) {
+      throw new Error("[handle_teams_message] Missing required keyring: agent_response_webhook_id");
+    }
 
     // DevRev token for agent dispatch: use PAT if configured in keyrings, otherwise fallback to service account
     const devrevPat = (
@@ -118,8 +126,7 @@ export async function handleEvent(event: any): Promise<void> {
     const aadObjectId = teamsActivity.from?.aadObjectId;
 
     console.log(
-      `[handle_teams_message] From: ${fromName} (aadObjectId: ${aadObjectId ?? "none"}, email: ${
-        fromEmail ?? "none"
+      `[handle_teams_message] From: ${fromName} (aadObjectId: ${aadObjectId ?? "none"}, email: ${fromEmail ?? "none"
       }), ConversationId: ${teamsActivity.conversation?.id}`
     );
 
@@ -156,8 +163,7 @@ export async function handleEvent(event: any): Promise<void> {
       });
       resolvedEmail = lookup.email;
       console.log(
-        `[handle_teams_message] Email lookup result: ${
-          resolvedEmail ? `resolved (${resolvedEmail})` : `not resolved (${lookup.matchCount} matches)`
+        `[handle_teams_message] Email lookup result: ${resolvedEmail ? `resolved (${resolvedEmail})` : `not resolved (${lookup.matchCount} matches)`
         }`
       );
     }

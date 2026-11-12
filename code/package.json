@@ -56,7 +56,7 @@
   "dependencies": {
     "@babel/runtime": "7.27.1",
     "@devrev/typescript-sdk": "1.1.60",
-    "axios": "1.13.5",
-    "protobufjs": "7.3.0"
+    "axios": "1.21.1",
+    "protobufjs": "8.8.1"
   }
 }
