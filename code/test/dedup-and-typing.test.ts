@@ -1,8 +1,11 @@
 import axios from "axios";
 import {
   checkAndRecordIncomingActivity,
+  releaseConversationLock,
+  checkAndRecordAgentResponse,
   clearDedupCache,
   ACTIVITY_ID_TTL_MS,
+  IN_FLIGHT_TTL_MS,
   RAPID_MESSAGE_TTL_MS,
 } from "../src/teams/dedup";
 import {
@@ -36,11 +39,25 @@ describe("Inbound Activity Deduplication (dedup.ts)", () => {
     expect(retry.reason).toContain("Duplicate activity ID \"act-100\" detected");
   });
 
-  it("allows different activity IDs from the same user if messages are different", () => {
+  it("blocks subsequent message in the same conversation while inquiry is in-flight (even if messages are different)", () => {
     const msg1 = checkAndRecordIncomingActivity("act-101", "conv-1", "Hello");
     expect(msg1.isDuplicate).toBe(false);
 
+    // Second message arrives while first is in-flight -> ignored to answer the first and prevent duplicate responses
     const msg2 = checkAndRecordIncomingActivity("act-102", "conv-1", "I need help with payroll");
+    expect(msg2.isDuplicate).toBe(true);
+    expect(msg2.reason).toContain("already processing an active inquiry");
+  });
+
+  it("allows subsequent message once in-flight conversation lock is released", () => {
+    const msg1 = checkAndRecordIncomingActivity("act-103", "conv-1", "Hello");
+    expect(msg1.isDuplicate).toBe(false);
+
+    // Agent response finishes and releases lock
+    releaseConversationLock("conv-1");
+
+    // Next question from user can now proceed
+    const msg2 = checkAndRecordIncomingActivity("act-104", "conv-1", "I need help with payroll");
     expect(msg2.isDuplicate).toBe(false);
   });
 
@@ -65,6 +82,19 @@ describe("Inbound Activity Deduplication (dedup.ts)", () => {
   it("handles missing or empty activityId gracefully", () => {
     const result = checkAndRecordIncomingActivity("", "conv-1", "Unique message 123");
     expect(result.isDuplicate).toBe(false);
+  });
+
+  it("deduplicates duplicate agent response callbacks", () => {
+    const isDup1 = checkAndRecordAgentResponse("conv-1:act-101");
+    expect(isDup1).toBe(false);
+
+    // Duplicate callback delivered
+    const isDup2 = checkAndRecordAgentResponse("conv-1:act-101");
+    expect(isDup2).toBe(true);
+
+    // Different response key is permitted
+    const isDup3 = checkAndRecordAgentResponse("conv-1:act-102");
+    expect(isDup3).toBe(false);
   });
 });
 

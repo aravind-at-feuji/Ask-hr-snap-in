@@ -16,7 +16,7 @@ import { dispatchToAgent } from "../../devrev/agent-client";
 import { getKeyringSecret } from "../../devrev/keyrings";
 import { resolveEmailByName, buildEmployeeContextHeader } from "../../devrev/users";
 import { TeamsReplyContext } from "../../devrev/types";
-import { checkAndRecordIncomingActivity } from "../../teams/dedup";
+import { checkAndRecordIncomingActivity, releaseConversationLock } from "../../teams/dedup";
 import { acquireBotToken, sendTypingIndicator } from "../../teams/teams-client";
 
 export async function handleEvent(event: any): Promise<void> {
@@ -121,6 +121,10 @@ export async function handleEvent(event: any): Promise<void> {
       }), ConversationId: ${teamsActivity.conversation?.id}`
     );
 
+    // Detect if inbound message is a greeting (e.g. "hello", "hi", "hey", "good morning")
+    const GREETING_REGEX = /^(hi|hello|hey|greetings|good\s*(morning|afternoon|evening)|namaste)\b/i;
+    const isUserGreeting = !isTopicSubmit && GREETING_REGEX.test(messageText.trim());
+
     // Build Teams reply context for the round-trip
     const replyContext: TeamsReplyContext = {
       serviceUrl: normalizeServiceUrl(teamsActivity.serviceUrl ?? ""),
@@ -131,6 +135,7 @@ export async function handleEvent(event: any): Promise<void> {
       recipientId: teamsActivity.from?.id ?? "",
       recipientName: fromName,
       activityId: teamsActivity.id,
+      isGreeting: isUserGreeting,
     };
 
     // Send typing indicator to Teams in parallel so user immediately sees "AskHR is typing..."
@@ -185,6 +190,16 @@ export async function handleEvent(event: any): Promise<void> {
   } catch (error: any) {
     console.error(`[handle_teams_message] ERROR: ${error.message}`);
     console.error(`[handle_teams_message] Stack: ${error.stack}`);
+    // Release in-flight lock on failure so the user isn't stuck
+    try {
+      const payload = event?.payload ?? {};
+      const teamsActivity = payload.data ?? payload;
+      if (teamsActivity?.conversation?.id) {
+        releaseConversationLock(teamsActivity.conversation.id);
+      }
+    } catch {
+      // Ignore cleanup error
+    }
   }
 }
 

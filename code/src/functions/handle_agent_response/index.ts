@@ -15,6 +15,11 @@ import { extractAgentResponse } from "../../devrev/agent-client";
 import { getKeyringSecret, redactEventForLog } from "../../devrev/keyrings";
 import { TeamsReplyContext } from "../../devrev/types";
 import {
+  checkAndRecordAgentResponse,
+  releaseConversationLock,
+  simpleHash,
+} from "../../teams/dedup";
+import {
   acquireBotToken,
   sendTextMessage,
   sendGreetingCard,
@@ -99,6 +104,15 @@ export async function handleEvent(event: any): Promise<void> {
       return;
     }
 
+    // Deduplication check: drop duplicate agent response callbacks (e.g. webhook retries)
+    const responseKey = `${replyContext.conversationId}:${replyContext.activityId || simpleHash(message)}`;
+    if (checkAndRecordAgentResponse(responseKey)) {
+      console.warn(
+        `[handle_agent_response] Duplicate agent response callback detected for key "${responseKey}". Dropping event to prevent duplicate Teams replies.`
+      );
+      return;
+    }
+
     // Acquire Bot Framework token
     console.log("[handle_agent_response] Acquiring Bot Framework token...");
     let botToken = "";
@@ -128,10 +142,23 @@ export async function handleEvent(event: any): Promise<void> {
       await sendTextMessage(botToken, replyContext, message);
     }
 
+    // Release in-flight lock for this conversation
+    releaseConversationLock(replyContext.conversationId);
+
     console.log("[handle_agent_response] ===== Reply sent to Teams. Done. =====");
   } catch (error: any) {
     console.error(`[handle_agent_response] ERROR: ${error.message}`);
     console.error(`[handle_agent_response] Stack: ${error.stack}`);
+  } finally {
+    try {
+      const { clientMetadata } = extractAgentResponse(event?.payload ?? event);
+      const convId = clientMetadata["conversationId"] ?? clientMetadata["conversation_id"];
+      if (convId) {
+        releaseConversationLock(convId);
+      }
+    } catch {
+      // Ignore cleanup error
+    }
   }
 }
 

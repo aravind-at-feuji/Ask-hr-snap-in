@@ -81,6 +81,10 @@ export async function dispatchToAgent(
     clientMetadata["activityId"] = replyContext.activityId;
   }
 
+  if (replyContext.isGreeting) {
+    clientMetadata["isGreeting"] = "true";
+  }
+
   const sessionId = replyContext.conversationId || `session-${Date.now()}`;
 
   // Build the payload conforming strictly to DevRev's execute-async schema:
@@ -353,8 +357,10 @@ export function extractAgentResponse(rawPayload: any): ExtractedAgentResponse {
     }
   }
 
-  // Detect greeting: check if flagged or matches greeting patterns
+  // Detect greeting: check if flagged in clientMetadata or payload or matches greeting patterns
   const isGreeting =
+    clientMetadata["isGreeting"] === "true" ||
+    clientMetadata["is_greeting"] === "true" ||
     payload?.is_greeting === true ||
     payload?.data?.is_greeting === true ||
     aiAgentResp?.is_greeting === true ||
@@ -398,9 +404,19 @@ function detectGreeting(message: string): boolean {
     "hello! i'm askhr",
     "hi there! i'm askhr",
     "how can i help you today",
+    "how can i help you",
     "what can i assist you with",
+    "how can i assist you today",
+    "how can i assist you",
     "i'm here to help with your hr",
     "welcome! i can help you with",
+    "feuji india ask hr",
+    "feuji ask hr",
+    "internal hr assistant",
+    "dedicated internal hr assistant",
+    "welcome! i'm feuji",
+    "welcome! i am feuji",
+    "queries or requests. how can i assist",
   ];
   return greetingPatterns.some((pattern) => lower.includes(pattern));
 }

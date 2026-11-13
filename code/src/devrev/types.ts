@@ -12,6 +12,7 @@ export interface TeamsReplyContext {
   recipientId: string;
   recipientName: string;
   activityId?: string;
+  isGreeting?: boolean;
 }
 
 /** Parsed inbound Teams activity (message or Action.Submit). */
