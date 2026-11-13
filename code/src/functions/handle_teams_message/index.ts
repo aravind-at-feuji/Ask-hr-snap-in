@@ -13,6 +13,7 @@
  * 6. Exit immediately — no polling
  */
 import { dispatchToAgent } from "../../devrev/agent-client";
+import { getKeyringSecret } from "../../devrev/keyrings";
 import { resolveEmailByName, buildEmployeeContextHeader } from "../../devrev/users";
 import { TeamsReplyContext } from "../../devrev/types";
 import { checkAndRecordIncomingActivity } from "../../teams/dedup";
@@ -27,37 +28,27 @@ export async function handleEvent(event: any): Promise<void> {
     const devrevEndpoint = event.execution_metadata.devrev_endpoint;
 
     // Credentials and configuration strictly from keyrings (secrets)
-    const keyrings = event.input_data?.keyrings ?? {};
+    const teamsAppPassword = getKeyringSecret(event, "teams-app-secret");
+    const teamsAppId = getKeyringSecret(event, "teams-bot-app-id");
+    const teamsTenantId = getKeyringSecret(event, "teams-bot-tenant-id");
 
-    const teamsAppPassword = keyrings["teams-app-secret"]?.secret ?? "";
-    const teamsAppId = keyrings["teams-bot-app-id"]?.secret ?? "";
-    const teamsTenantId = keyrings["teams-bot-tenant-id"]?.secret ?? "";
-
-    const agentId = (
-      keyrings["askhr_agent_id"]?.secret ??
-      keyrings["askhr-agent-id"]?.secret ??
-      ""
-    ).trim();
+    const agentId = getKeyringSecret(event, "askhr_agent_id", "askhr-agent-id");
     if (!agentId) {
       throw new Error("[handle_teams_message] Missing required keyring: askhr_agent_id");
     }
 
     // Webhook DON pointing to the agent-response event source for execute-async callback
-    const agentResponseWebhookId = (
-      keyrings["agent_response_webhook_id"]?.secret ??
-      keyrings["agent-response-webhook-id"]?.secret ??
-      ""
-    ).trim();
+    const agentResponseWebhookId = getKeyringSecret(
+      event,
+      "agent_response_webhook_id",
+      "agent-response-webhook-id"
+    );
     if (!agentResponseWebhookId) {
       throw new Error("[handle_teams_message] Missing required keyring: agent_response_webhook_id");
     }
 
     // DevRev token for agent dispatch: use PAT if configured in keyrings, otherwise fallback to service account
-    const devrevPat = (
-      keyrings["devrev_pat"]?.secret ??
-      keyrings["devrev-pat"]?.secret ??
-      ""
-    ).trim();
+    const devrevPat = getKeyringSecret(event, "devrev_pat", "devrev-pat");
     const agentToken = devrevPat || event.context.secrets.service_account_token;
     const directoryToken = event.context.secrets.service_account_token;
 

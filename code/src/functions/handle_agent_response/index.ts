@@ -12,6 +12,7 @@
  * 5. Authenticate to Bot Framework and POST the reply to Teams
  */
 import { extractAgentResponse } from "../../devrev/agent-client";
+import { getKeyringSecret, redactEventForLog } from "../../devrev/keyrings";
 import { TeamsReplyContext } from "../../devrev/types";
 import {
   acquireBotToken,
@@ -24,24 +25,15 @@ export async function handleEvent(event: any): Promise<void> {
 
   try {
     // 1. Log the FULL raw callback payload so we can inspect the exact structure from DevRev.
-    // Redact secret values in keyrings to ensure security compliance.
-    const safeEvent = { ...event };
-    if (safeEvent.input_data?.keyrings) {
-      const safeKeyrings: Record<string, any> = {};
-      for (const [k, v] of Object.entries(safeEvent.input_data.keyrings as Record<string, any>)) {
-        safeKeyrings[k] = { ...v, secret: v.secret ? "***REDACTED***" : undefined };
-      }
-      safeEvent.input_data = { ...safeEvent.input_data, keyrings: safeKeyrings };
-    }
+    // Redact secret values across keyrings, resources.keyrings, and context.secrets.
+    const safeEvent = redactEventForLog(event);
     console.log(`[handle_agent_response] FULL raw event: ${JSON.stringify(safeEvent)}`);
     console.log(`[handle_agent_response] FULL raw callback payload: ${JSON.stringify(event?.payload)}`);
 
     // Extract secrets and configuration strictly from keyrings
-    const keyrings = event.input_data?.keyrings ?? {};
-
-    const teamsAppPassword = keyrings["teams-app-secret"]?.secret ?? "";
-    const teamsAppId = keyrings["teams-bot-app-id"]?.secret ?? "";
-    const teamsTenantId = keyrings["teams-bot-tenant-id"]?.secret ?? "";
+    const teamsAppPassword = getKeyringSecret(event, "teams-app-secret");
+    const teamsAppId = getKeyringSecret(event, "teams-bot-app-id");
+    const teamsTenantId = getKeyringSecret(event, "teams-bot-tenant-id");
 
     // Extract the agent response from the actual payload structure
     const {

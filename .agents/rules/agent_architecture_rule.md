@@ -11,6 +11,15 @@
 
 ---
 
+## ⛔ MUST FOLLOW: Do NOT Modify `manifest.yaml`
+
+> [!CAUTION]
+> **NEVER edit or modify `manifest.yaml` unless the user explicitly asks to change the manifest.**
+> - Changing `manifest.yaml` (keyrings, event sources, Rego policies, inputs, or metadata) triggers a **force upgrade** on upgrade/redeploy, recreating/changing the snap-in's webhook/event-source trigger URLs and breaking live Azure Bot / AskHR webhook bindings.
+> - All runtime fixes, parsing, logging, and credential lookup logic must be done inside `code/src/` without altering `manifest.yaml`.
+
+---
+
 ## Mandated Architecture: Two-Phase Async
 
 The AskHR snap-in uses a **two-phase asynchronous** design to bridge Microsoft Teams to the DevRev AskHR agent. This is necessary because DevRev's serverless runtime has no persistent HTTP server — a single function cannot wait/poll for the agent reply.
