@@ -73,15 +73,15 @@ export async function handleEvent(event: any): Promise<void> {
     if (teamsActivity.type === "invoke" || teamsActivity.value?.action === "askhr_topic_submit") {
       // Action.Submit from the greeting Adaptive Card
       const selectedTopic = teamsActivity.value?.selectedTopic ?? "";
-      messageText = selectedTopic;
+      messageText = stripLeadingEmoji(selectedTopic);
       isTopicSubmit = true;
-      console.log(`[handle_teams_message] Action.Submit detected — topic: "${selectedTopic}"`);
+      console.log(`[handle_teams_message] Action.Submit detected — topic: "${selectedTopic}" -> "${messageText}"`);
     } else if (teamsActivity.value?.action === "askhr_topic_submit") {
       // Alternative Action.Submit path
       const selectedTopic = teamsActivity.value?.selectedTopic ?? "";
-      messageText = selectedTopic;
+      messageText = stripLeadingEmoji(selectedTopic);
       isTopicSubmit = true;
-      console.log(`[handle_teams_message] Action.Submit detected (alt) — topic: "${selectedTopic}"`);
+      console.log(`[handle_teams_message] Action.Submit detected (alt) — topic: "${selectedTopic}" -> "${messageText}"`);
     } else {
       // Regular message
       messageText = teamsActivity.text ?? "";
@@ -218,6 +218,14 @@ function normalizeServiceUrl(url: string): string {
 function stripBotMention(text: string): string {
   // Remove HTML-style <at>...</at> tags
   return text.replace(/<at>.*?<\/at>\s*/gi, "").trim();
+}
+
+/**
+ * Strip leading emojis and whitespace from selected topic strings for clean agent dispatch.
+ */
+export function stripLeadingEmoji(str: string): string {
+  if (!str) return "";
+  return str.replace(/^[\p{Emoji}\p{Extended_Pictographic}\uFE0F\u200D\s]+/u, "").trim();
 }
 
 export const run = async (events: any[]) => {

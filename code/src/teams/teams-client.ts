@@ -12,26 +12,26 @@ const BOT_FRAMEWORK_TOKEN_URL_TEMPLATE =
   "https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token";
 const BOT_FRAMEWORK_SCOPE = "https://api.botframework.com/.default";
 
-/** The 18 HR topics for the greeting Adaptive Card. */
+/** The 18 HR topics for the greeting Adaptive Card with emojis. */
 export const HR_TOPICS = [
-  "Onboarding & Joining Formalities",
-  "BGV",
-  "ID & Access Management",
-  "Payroll Timelines",
-  "Payroll & Statutory",
-  "PF / Tax",
-  "Leave Management",
-  "Attendance Management",
-  "Probation",
-  "Variable Payout",
-  "Exit Management",
-  "Compensatory Offs",
-  "Health Insurance",
-  "HR Policy",
-  "Expense Management",
-  "L&D",
-  "HRMS (Nicoya)",
-  "Employee Letters",
+  "👋 Onboarding & Joining Formalities",
+  "🔍 BGV",
+  "🪪 ID & Access Management",
+  "⏰ Payroll Timelines",
+  "💰 Payroll & Statutory",
+  "📊 PF / Tax",
+  "🌴 Leave Management",
+  "⏱️ Attendance Management",
+  "⏳ Probation",
+  "🎯 Variable Payout",
+  "🚪 Exit Management",
+  "⚖️ Compensatory Offs",
+  "🏥 Health Insurance",
+  "📜 HR Policy",
+  "💳 Expense Management",
+  "🎓 L&D",
+  "💻 HRMS (Nicoya)",
+  "📄 Employee Letters",
 ];
 
 interface CachedToken {

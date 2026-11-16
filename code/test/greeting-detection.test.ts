@@ -1,4 +1,6 @@
 import { extractAgentResponse } from "../src/devrev/agent-client";
+import { stripLeadingEmoji } from "../src/functions/handle_teams_message";
+import { HR_TOPICS } from "../src/teams/teams-client";
 
 describe("Greeting Detection (agent-client.ts)", () => {
   it("detects greeting from Feuji AskHR welcome message", () => {
@@ -60,6 +62,23 @@ describe("Greeting Detection (agent-client.ts)", () => {
 
     const result = extractAgentResponse(payload);
     expect(result.isGreeting).toBe(false);
+  });
+
+  it("verifies all 18 HR topics have emojis and stripLeadingEmoji cleans them", () => {
+    expect(HR_TOPICS).toHaveLength(18);
+
+    for (const topic of HR_TOPICS) {
+      // Must contain an emoji at the start
+      expect(topic).toMatch(/^[\p{Emoji}\p{Extended_Pictographic}]/u);
+
+      const cleaned = stripLeadingEmoji(topic);
+      expect(cleaned.length).toBeGreaterThan(0);
+      // Cleaned topic should no longer start with an emoji
+      expect(cleaned).not.toMatch(/^[\p{Emoji}\p{Extended_Pictographic}]/u);
+    }
+
+    expect(stripLeadingEmoji("🌴 Leave Management")).toBe("Leave Management");
+    expect(stripLeadingEmoji("Leave Management")).toBe("Leave Management");
   });
 });
 
