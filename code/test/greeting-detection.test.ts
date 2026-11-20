@@ -64,6 +64,52 @@ describe("Greeting Detection (agent-client.ts)", () => {
     expect(result.isGreeting).toBe(false);
   });
 
+  it("does not classify as greeting when clientMetadata has isGreeting = 'false' even if message includes intro text", () => {
+    const payload = {
+      type: "ai_agent_response",
+      payload: {
+        ai_agent_response: {
+          agent_response: "message",
+          message:
+            "Hello! I'm Feuji India Ask HR. Regarding Payroll and P&F: Your salary is credited on the last working day of the month. PF deductions are 12% of basic pay.",
+          client_metadata: {
+            conversationId: "conv-1",
+            serviceUrl: "https://smba.trafficmanager.net/in/",
+            isGreeting: "false",
+          },
+        },
+      },
+    };
+
+    const result = extractAgentResponse(payload);
+    expect(result.isGreeting).toBe(false);
+  });
+
+  it("does not classify long answers as greetings even if intro phrase appears", () => {
+    const longAnswer =
+      "Welcome to Feuji! I'm Feuji India Ask HR — your dedicated internal HR assistant at Feuji. " +
+      "Regarding your inquiry about the leave policy, all full-time employees are eligible for 24 days of paid leave per year. " +
+      "Leaves can be requested through the Nicoya HRMS portal at least 3 days in advance. Please reach out to your manager for urgent approvals. " +
+      "How can I assist you with anything else?";
+
+    const payload = {
+      type: "ai_agent_response",
+      payload: {
+        ai_agent_response: {
+          agent_response: "message",
+          message: longAnswer,
+          client_metadata: {
+            conversationId: "conv-1",
+            serviceUrl: "https://smba.trafficmanager.net/in/",
+          },
+        },
+      },
+    };
+
+    const result = extractAgentResponse(payload);
+    expect(result.isGreeting).toBe(false);
+  });
+
   it("verifies all 18 HR topics have emojis and stripLeadingEmoji cleans them", () => {
     expect(HR_TOPICS).toHaveLength(18);
 

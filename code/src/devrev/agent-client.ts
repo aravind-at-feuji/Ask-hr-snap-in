@@ -81,8 +81,8 @@ export async function dispatchToAgent(
     clientMetadata["activityId"] = replyContext.activityId;
   }
 
-  if (replyContext.isGreeting) {
-    clientMetadata["isGreeting"] = "true";
+  if (replyContext.isGreeting !== undefined) {
+    clientMetadata["isGreeting"] = replyContext.isGreeting ? "true" : "false";
   }
 
   const sessionId = replyContext.conversationId || `session-${Date.now()}`;
@@ -357,14 +357,17 @@ export function extractAgentResponse(rawPayload: any): ExtractedAgentResponse {
     }
   }
 
-  // Detect greeting: check if flagged in clientMetadata or payload or matches greeting patterns
+  // Detect greeting: if the inbound message was explicitly a question/prompt (isGreeting === "false"),
+  // never classify as a greeting card, even if the agent used polite greetings in its answer.
   const isGreeting =
-    clientMetadata["isGreeting"] === "true" ||
-    clientMetadata["is_greeting"] === "true" ||
-    payload?.is_greeting === true ||
-    payload?.data?.is_greeting === true ||
-    aiAgentResp?.is_greeting === true ||
-    detectGreeting(message);
+    clientMetadata["isGreeting"] === "false"
+      ? false
+      : clientMetadata["isGreeting"] === "true" ||
+        clientMetadata["is_greeting"] === "true" ||
+        payload?.is_greeting === true ||
+        payload?.data?.is_greeting === true ||
+        aiAgentResp?.is_greeting === true ||
+        detectGreeting(message);
 
   // Determine if this is the final complete message event:
   // In DevRev execute-async callbacks, final response has agent_response === "message"
@@ -398,6 +401,12 @@ export function extractAgentResponse(rawPayload: any): ExtractedAgentResponse {
  */
 function detectGreeting(message: string): boolean {
   if (!message) return false;
+
+  // Real informational answers are longer than pure welcome greetings (typically > 250 chars)
+  if (message.length > 250) {
+    return false;
+  }
+
   const lower = message.toLowerCase();
   const greetingPatterns = [
     "welcome to askhr",

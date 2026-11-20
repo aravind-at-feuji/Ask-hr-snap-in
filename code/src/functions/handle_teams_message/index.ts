@@ -121,9 +121,11 @@ export async function handleEvent(event: any): Promise<void> {
       }), ConversationId: ${teamsActivity.conversation?.id}`
     );
 
-    // Detect if inbound message is a greeting (e.g. "hello", "hi", "hey", "good morning")
-    const GREETING_REGEX = /^(hi|hello|hey|greetings|good\s*(morning|afternoon|evening)|namaste)\b/i;
-    const isUserGreeting = !isTopicSubmit && GREETING_REGEX.test(messageText.trim());
+    // Detect if inbound message is a pure greeting (e.g. "hello", "hi there", "good morning")
+    // If user asks "hello what is the leave policy", it contains a question and must NOT trigger greeting card
+    const PURE_GREETING_REGEX =
+      /^(hi|hello|hey|greetings|good\s*(morning|afternoon|evening)|namaste)(\s+(there|team|bot|askhr|hr|all|everyone))?[!.,? ]*$/i;
+    const isUserGreeting = !isTopicSubmit && PURE_GREETING_REGEX.test(messageText.trim());
 
     // Build Teams reply context for the round-trip
     const replyContext: TeamsReplyContext = {
